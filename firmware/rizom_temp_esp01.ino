@@ -26,18 +26,16 @@
 const char* WIFI_SSID     = "NOME_DA_REDE";
 const char* WIFI_SENHA    = "SENHA_WIFI";
 
-const char* MQTT_SERVIDOR = "seudominio.com";   // IP ou domínio do VPS
-const int   MQTT_PORTA    = 1883;
-const char* MQTT_USUARIO  = "esp01_a1b2c3";     // device_id gerado pelo backend
-const char* MQTT_SENHA    = "senha_do_dispositivo"; // configure no Mosquitto
+const char* MQTT_SERVIDOR = "192.168.1.XXX"; // ← IP do Raspberry Pi na rede local
+                                               //   (descubra com: hostname -I no Pi)
+const int   MQTT_PORTA    = 1883;              // porta TCP direta — funciona na rede local
+const char* MQTT_USUARIO  = "";                // vazio em desenvolvimento
+const char* MQTT_SENHA    = "";                // vazio em desenvolvimento
 
-// Tópicos (copie da resposta GET /equipamentos/:id/config-dispositivo)
-const char* TOPICO_TEMP   = "rizomtemp/esp01_a1b2c3/temperatura";
-const char* TOPICO_HEART  = "rizomtemp/esp01_a1b2c3/heartbeat";
-
-// Intervalo de leitura
-const unsigned long INTERVALO_LEITURA_MS  = 60000;  // 60 segundos
-const unsigned long INTERVALO_HEARTBEAT_MS = 120000; // 2 minutos
+// device_id: copie do cadastro do equipamento no dashboard
+// Ex: esp01_685c452f (Câmara fria 01)
+const char* TOPICO_TEMP   = "rizomtemp/SEU_DEVICE_ID/temperatura";
+const char* TOPICO_HEART  = "rizomtemp/SEU_DEVICE_ID/heartbeat";
 // ────────────────────────────────────────────────────────────────────────────
 
 // DS18B20 no GPIO2
