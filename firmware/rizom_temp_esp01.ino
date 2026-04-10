@@ -38,6 +38,10 @@ const char* TOPICO_TEMP   = "rizomtemp/SEU_DEVICE_ID/temperatura";
 const char* TOPICO_HEART  = "rizomtemp/SEU_DEVICE_ID/heartbeat";
 // ────────────────────────────────────────────────────────────────────────────
 
+// Intervalo de leitura
+const unsigned long INTERVALO_LEITURA_MS  = 60000;  // 60 segundos
+const unsigned long INTERVALO_HEARTBEAT_MS = 120000; // 2 minutos
+
 // DS18B20 no GPIO2
 #define PINO_SENSOR 2
 OneWire oneWire(PINO_SENSOR);
