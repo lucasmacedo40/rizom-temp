@@ -66,6 +66,11 @@ export interface Alerta {
   equipamento_nome: string;
 }
 
+export interface CodigoPareamento {
+  codigo: string;
+  expira_em: string;
+}
+
 export interface Resumo {
   total_equipamentos: number;
   leituras_24h: number;
@@ -97,6 +102,8 @@ export const equipamentosApi = {
   atualizar: (id: string, dados: Partial<Equipamento>) =>
     api.patch<Equipamento>(`/equipamentos/${id}`, dados),
   configDispositivo: (id: string) => api.get(`/equipamentos/${id}/config-dispositivo`),
+  gerarCodigo: (id: string) =>
+    api.post<CodigoPareamento>(`/equipamentos/${id}/pareamento`),
 };
 
 export const leiturasApi = {

@@ -6,7 +6,8 @@ import {
   ReferenceLine, ResponsiveContainer, Legend,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, RefreshCw, Plus } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Plus, Wifi } from 'lucide-react';
+import ModalConfigurarDispositivo from '../components/ModalConfigurarDispositivo';
 import { equipamentosApi, leiturasApi } from '../api';
 import type { Equipamento, PontoGrafico } from '../api';
 
@@ -24,6 +25,7 @@ export default function EquipamentoDetalhe() {
   const [tempManual, setTempManual] = useState('');
   const [obsManual, setObsManual] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [showConfigurar, setShowConfigurar] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -121,6 +123,17 @@ export default function EquipamentoDetalhe() {
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => setShowConfigurar(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', borderRadius: 10, padding: '8px 14px', fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <Wifi size={13} /> Configurar dispositivo
+          </button>
           <button
             onClick={() => setShowManual(true)}
             style={{
@@ -284,6 +297,13 @@ export default function EquipamentoDetalhe() {
             </div>
           </div>
         </div>
+      )}
+
+      {showConfigurar && equip && (
+        <ModalConfigurarDispositivo
+          equipamentoId={equip.id}
+          onFechar={() => setShowConfigurar(false)}
+        />
       )}
     </div>
   );

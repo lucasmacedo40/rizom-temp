@@ -4,6 +4,7 @@ import { equipamentosApi } from '../api';
 import type { Equipamento } from '../api';
 import EquipamentoCard from '../components/EquipamentoCard';
 import { Plus, X } from 'lucide-react';
+import ModalConfigurarDispositivo from '../components/ModalConfigurarDispositivo';
 
 const TIPOS = [
   { value: 'camara_fria', label: 'Câmara Fria', limites: '-18°C a -15°C' },
@@ -19,6 +20,7 @@ export default function Equipamentos() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<{ nome: string; tipo: string; localizacao: string }>({ nome: '', tipo: 'refrigerador', localizacao: '' });
   const [salvando, setSalvando] = useState(false);
+  const [equipCriado, setEquipCriado] = useState<string | null>(null);
 
   async function carregar() {
     const { data } = await equipamentosApi.listar();
@@ -32,9 +34,10 @@ export default function Equipamentos() {
     if (!form.nome) return;
     setSalvando(true);
     try {
-      await equipamentosApi.criar(form as Partial<Equipamento>);
+      const { data } = await equipamentosApi.criar(form as Partial<Equipamento>);
       setShowModal(false);
       setForm({ nome: '', tipo: 'refrigerador', localizacao: '' });
+      setEquipCriado(data.id);
       carregar();
     } finally {
       setSalvando(false);
@@ -162,6 +165,13 @@ export default function Equipamentos() {
             </div>
           </div>
         </div>
+      )}
+
+      {equipCriado && (
+        <ModalConfigurarDispositivo
+          equipamentoId={equipCriado}
+          onFechar={() => setEquipCriado(null)}
+        />
       )}
     </div>
   );
