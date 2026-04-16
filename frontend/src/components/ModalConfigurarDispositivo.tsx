@@ -14,14 +14,18 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
   const [loading, setLoading] = useState(true);
   const [segundosRestantes, setSegundosRestantes] = useState(600);
   const [copiado, setCopiado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function gerarCodigo() {
     setLoading(true);
+    setErro(null);
     try {
       const { data } = await equipamentosApi.gerarCodigo(equipamentoId);
       setPar(data);
       const expiresAt = new Date(data.expira_em).getTime();
       setSegundosRestantes(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
+    } catch {
+      setErro('Não foi possível gerar o código. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -30,16 +34,21 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
   useEffect(() => { gerarCodigo(); }, []);
 
   useEffect(() => {
-    if (segundosRestantes <= 0) return;
-    const timer = setInterval(() => setSegundosRestantes(s => Math.max(0, s - 1)), 1000);
+    const timer = setInterval(() => {
+      setSegundosRestantes(s => Math.max(0, s - 1));
+    }, 1000);
     return () => clearInterval(timer);
-  }, [segundosRestantes]);
+  }, []);
 
-  function copiar() {
+  async function copiar() {
     if (!par) return;
-    navigator.clipboard.writeText(par.codigo);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
+    try {
+      await navigator.clipboard.writeText(par.codigo);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // clipboard unavailable — silently ignore
+    }
   }
 
   const minutos = String(Math.floor(segundosRestantes / 60)).padStart(2, '0');
@@ -102,6 +111,26 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>
             Gerando código...
           </div>
+        ) : erro ? (
+          <div style={{
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 12, padding: 16, textAlign: 'center',
+            color: '#ef4444', fontSize: 14, marginBottom: 12,
+          }}>
+            {erro}
+            <div style={{ marginTop: 10 }}>
+              <button
+                onClick={gerarCodigo}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, fontSize: 13,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  color: 'var(--text-secondary)', cursor: 'pointer',
+                }}
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </div>
         ) : (
           <>
             <div style={{
@@ -141,12 +170,14 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
               </button>
               <button
                 onClick={gerarCodigo}
+                disabled={loading}
                 style={{
                   flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-secondary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  cursor: 'pointer',
+                  opacity: loading ? 0.5 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer',
                 }}
               >
                 <RefreshCw size={14} /> Gerar novo
