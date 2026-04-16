@@ -17,6 +17,7 @@ const relatoriosRoutes = require('./routes/relatorios');
 const provisioningRoutes = require('./routes/provisioning');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // ─── Segurança ────────────────────────────────────────────────────────────────
