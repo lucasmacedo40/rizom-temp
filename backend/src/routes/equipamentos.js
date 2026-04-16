@@ -124,7 +124,7 @@ router.get('/:id/config-dispositivo', autenticar, async (req, res) => {
 router.post('/:id/pareamento', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
   const { id } = req.params;
 
-  // Verify equipment belongs to authenticated client
+  // Verifica se o equipamento pertence ao cliente
   const { rows: equips } = await db.query(
     `SELECT id FROM equipamentos WHERE id = $1 AND cliente_id = $2 AND ativo = true`,
     [id, req.usuario.cliente_id]
@@ -133,34 +133,32 @@ router.post('/:id/pareamento', autenticar, exigirPerfil('admin', 'operador'), as
     return res.status(404).json({ erro: 'Equipamento não encontrado' });
   }
 
-  // Invalidate previous unused codes for this equipment
+  // Invalida códigos anteriores não usados
   await db.query(
     `UPDATE codigos_pareamento SET usado = TRUE
      WHERE equipamento_id = $1 AND usado = FALSE`,
     [id]
   );
 
-  // Generate unique 6-digit code
-  let codigo;
+  // Gera código único de 6 dígitos de forma atômica
+  let inserted = null;
   let tentativas = 0;
-  do {
-    codigo = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  while (!inserted && tentativas < 10) {
+    const codigo = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
     const { rows } = await db.query(
-      `SELECT 1 FROM codigos_pareamento WHERE codigo = $1 AND usado = FALSE`,
-      [codigo]
+      `INSERT INTO codigos_pareamento (equipamento_id, codigo)
+       VALUES ($1, $2)
+       ON CONFLICT DO NOTHING
+       RETURNING codigo, expira_em`,
+      [id, codigo]
     );
-    if (rows.length === 0) break;
+    if (rows.length > 0) inserted = rows[0];
     tentativas++;
-  } while (tentativas < 10);
-
-  const { rows } = await db.query(
-    `INSERT INTO codigos_pareamento (equipamento_id, codigo)
-     VALUES ($1, $2)
-     RETURNING codigo, expira_em`,
-    [id, codigo]
-  );
-
-  res.json({ codigo: rows[0].codigo, expira_em: rows[0].expira_em });
+  }
+  if (!inserted) {
+    return res.status(503).json({ erro: 'Não foi possível gerar código. Tente novamente.' });
+  }
+  res.json({ codigo: inserted.codigo, expira_em: inserted.expira_em });
 });
 
 module.exports = router;

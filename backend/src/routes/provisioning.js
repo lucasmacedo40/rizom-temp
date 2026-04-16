@@ -13,7 +13,7 @@ router.get('/:codigo', async (req, res) => {
   }
 
   const { rows } = await db.query(
-    `SELECT cp.equipamento_id, e.device_id, e.temp_min, e.temp_max
+    `SELECT cp.equipamento_id, e.device_id
      FROM codigos_pareamento cp
      JOIN equipamentos e ON e.id = cp.equipamento_id
      WHERE cp.codigo = $1
@@ -28,7 +28,7 @@ router.get('/:codigo', async (req, res) => {
 
   const equip = rows[0];
 
-  // Marks as used
+  // Marca código como usado
   await db.query(
     `UPDATE codigos_pareamento SET usado = TRUE WHERE codigo = $1`,
     [codigo]
@@ -37,7 +37,7 @@ router.get('/:codigo', async (req, res) => {
   res.json({
     device_id:    equip.device_id,
     mqtt_host:    process.env.MQTT_HOST_LOCAL || process.env.MQTT_HOST || 'localhost',
-    mqtt_port:    parseInt(process.env.MQTT_PORT || '1883'),
+    mqtt_port:    parseInt(process.env.MQTT_PORT || '1883', 10),
     intervalo_seg: 60,
   });
 });

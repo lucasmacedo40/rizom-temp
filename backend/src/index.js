@@ -48,6 +48,11 @@ app.use('/equipamentos', equipamentosRoutes);
 app.use('/leituras', leiturasRoutes);
 app.use('/alertas', alertasRoutes);
 app.use('/relatorios', relatoriosRoutes);
+app.use('/provisioning', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { erro: 'Muitas tentativas. Tente novamente mais tarde.' },
+}));
 app.use('/provisioning', provisioningRoutes);
 
 // Health check
