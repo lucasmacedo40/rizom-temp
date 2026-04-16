@@ -120,4 +120,48 @@ router.get('/:id/config-dispositivo', autenticar, async (req, res) => {
   });
 });
 
+// POST /equipamentos/:id/pareamento — gera código de 6 dígitos para provisioning
+router.post('/:id/pareamento', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
+  const { id } = req.params;
+
+  // Verify equipment belongs to authenticated client
+  const { rows: equips } = await db.query(
+    `SELECT id FROM equipamentos WHERE id = $1 AND cliente_id = $2 AND ativo = true`,
+    [id, req.usuario.cliente_id]
+  );
+  if (equips.length === 0) {
+    return res.status(404).json({ erro: 'Equipamento não encontrado' });
+  }
+
+  // Invalidate previous unused codes for this equipment
+  await db.query(
+    `UPDATE codigos_pareamento SET usado = TRUE
+     WHERE equipamento_id = $1 AND usado = FALSE`,
+    [id]
+  );
+
+  // Generate unique 6-digit code
+  let codigo;
+  let tentativas = 0;
+  do {
+    codigo = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    const { rows } = await db.query(
+      `SELECT 1 FROM codigos_pareamento WHERE codigo = $1 AND usado = FALSE`,
+      [codigo]
+    );
+    if (rows.length === 0) break;
+    tentativas++;
+  } while (tentativas < 10);
+
+  const { rows } = await db.query(
+    `INSERT INTO codigos_pareamento (equipamento_id, codigo)
+     VALUES ($1, $2)
+     RETURNING codigo, expira_em`,
+    [id, codigo]
+  );
+
+  res.json({ codigo: rows[0].codigo, expira_em: rows[0].expira_em });
+});
+
 module.exports = router;
+

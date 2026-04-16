@@ -14,6 +14,7 @@ const equipamentosRoutes = require('./routes/equipamentos');
 const leiturasRoutes = require('./routes/leituras');
 const alertasRoutes = require('./routes/alertas');
 const relatoriosRoutes = require('./routes/relatorios');
+const provisioningRoutes = require('./routes/provisioning');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +48,7 @@ app.use('/equipamentos', equipamentosRoutes);
 app.use('/leituras', leiturasRoutes);
 app.use('/alertas', alertasRoutes);
 app.use('/relatorios', relatoriosRoutes);
+app.use('/provisioning', provisioningRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
