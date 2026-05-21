@@ -1,5 +1,6 @@
 // src/index.js — Rizom Temp Backend
 require('dotenv').config();
+const { validateRuntimeEnv } = require('./config/env');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,10 +16,13 @@ const leiturasRoutes = require('./routes/leituras');
 const alertasRoutes = require('./routes/alertas');
 const relatoriosRoutes = require('./routes/relatorios');
 const provisioningRoutes = require('./routes/provisioning');
+const configuracoesRoutes = require('./routes/configuracoes');
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
+
+validateRuntimeEnv();
 
 // ─── Segurança ────────────────────────────────────────────────────────────────
 app.use(helmet());
@@ -55,6 +59,7 @@ app.use('/provisioning', rateLimit({
   message: { erro: 'Muitas tentativas. Tente novamente mais tarde.' },
 }));
 app.use('/provisioning', provisioningRoutes);
+app.use('/configuracoes', configuracoesRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
