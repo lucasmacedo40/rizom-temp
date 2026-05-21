@@ -76,7 +76,7 @@ jobs:
         working-directory: /opt/rizomtemp/backend
 
       - name: Restart backend
-        run: pm2 reload rizomtemp-backend --update-env
+        run: sudo systemctl restart rizomtemp-backend
 
       - name: Health check
         run: |
