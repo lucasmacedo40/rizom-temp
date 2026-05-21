@@ -25,3 +25,6 @@ Thumbs.db
 
 # Temp
 *.tmp
+
+# MCP config (contém tokens sensíveis)
+.mcp.json
