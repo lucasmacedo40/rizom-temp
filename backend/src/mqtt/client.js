@@ -150,4 +150,13 @@ function publicar(topico, payload) {
   client.publish(topico, JSON.stringify(payload), { qos: 1 });
 }
 
-module.exports = { conectar, publicar };
+function getStatus() {
+  return {
+    conectado: Boolean(client?.connected),
+    host: process.env.MQTT_HOST || 'localhost',
+    port: parseInt(process.env.MQTT_PORT || '1883', 10),
+    clientId: client?.options?.clientId || null,
+  };
+}
+
+module.exports = { conectar, publicar, getStatus };
