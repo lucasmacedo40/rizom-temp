@@ -59,6 +59,13 @@ router.get('/mensal', autenticar, async (req, res) => {
     `attachment; filename="rizom-temp-${mes || format(new Date(), 'yyyy-MM')}.pdf"`
   );
 
+  // Fire-and-forget audit record
+  db.query(
+    `INSERT INTO relatorios (cliente_id, tipo, periodo_inicio, periodo_fim, gerado_por)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [req.usuario.cliente_id, 'mensal', inicio, fim, req.usuario.id]
+  ).catch(err => console.error('[Relatorios] Erro ao registrar auditoria:', err.message));
+
   const doc = new PDFDocument({ margin: 50, size: 'A4' });
   doc.pipe(res);
 
@@ -145,15 +152,33 @@ router.get('/mensal', autenticar, async (req, res) => {
 // GET /relatorios/resumo — dados JSON para dashboard
 router.get('/resumo', autenticar, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT
-       COUNT(DISTINCT e.id) AS total_equipamentos,
-       COUNT(l.id) FILTER (WHERE l.registrado_em >= NOW() - INTERVAL '24 hours') AS leituras_24h,
-       COUNT(l.id) FILTER (WHERE NOT l.dentro_limite AND l.registrado_em >= NOW() - INTERVAL '24 hours') AS alertas_24h,
-       COUNT(a.id) FILTER (WHERE NOT a.reconhecido) AS alertas_nao_reconhecidos
-     FROM equipamentos e
-     LEFT JOIN leituras l ON l.equipamento_id = e.id
-     LEFT JOIN alertas a ON a.cliente_id = e.cliente_id
-     WHERE e.cliente_id = $1 AND e.ativo = true`,
+    `WITH equipamentos_cliente AS (
+       SELECT id
+       FROM equipamentos
+       WHERE cliente_id = $1 AND ativo = true
+     ),
+     leituras_resumo AS (
+       SELECT
+         COUNT(*) FILTER (WHERE l.registrado_em >= NOW() - INTERVAL '24 hours') AS leituras_24h,
+         COUNT(*) FILTER (
+           WHERE NOT l.dentro_limite
+             AND l.registrado_em >= NOW() - INTERVAL '24 hours'
+         ) AS alertas_24h
+       FROM leituras l
+       JOIN equipamentos_cliente e ON e.id = l.equipamento_id
+     ),
+     alertas_resumo AS (
+       SELECT COUNT(*) FILTER (WHERE NOT reconhecido) AS alertas_nao_reconhecidos
+       FROM alertas
+       WHERE cliente_id = $1
+     )
+     SELECT
+       (SELECT COUNT(*) FROM equipamentos_cliente) AS total_equipamentos,
+       COALESCE(l.leituras_24h, 0) AS leituras_24h,
+       COALESCE(l.alertas_24h, 0) AS alertas_24h,
+       COALESCE(a.alertas_nao_reconhecidos, 0) AS alertas_nao_reconhecidos
+     FROM leituras_resumo l
+     CROSS JOIN alertas_resumo a`,
     [req.usuario.cliente_id]
   );
   res.json(rows[0]);
