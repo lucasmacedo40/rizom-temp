@@ -128,6 +128,8 @@ async function processarLeitura(deviceId, dados) {
   // Verifica se deve gerar alerta
   if (!dentroLimite && equip.alerta_ativo) {
     await alertaService.verificarEGerarAlerta(equip, temperatura);
+  } else if (dentroLimite && equip.alerta_ativo) {
+    await alertaService.limparAlerta(equip.id);
   }
 
   console.log(`[MQTT] ${equip.nome} → ${temperatura}°C ${dentroLimite ? '✓' : '⚠ ALERTA'}`);
