@@ -14,31 +14,25 @@ push to main (CI must pass)
 
 ## Secrets obrigatórios
 
-Configure em: **GitHub → Settings → Secrets and variables → Actions**
+Nenhum. O deploy usa **self-hosted runner** — o job roda diretamente no VPS, sem SSH nem chaves.
 
-| Secret | Exemplo | Descrição |
-|--------|---------|-----------|
-| `VPS_HOST` | `203.0.113.10` | IP ou domínio do VPS |
-| `VPS_USER` | `ubuntu` | Usuário SSH no VPS |
-| `VPS_SSH_KEY` | `-----BEGIN OPENSSH...` | Chave SSH privada (Ed25519 recomendado) |
-| `VPS_DEPLOY_PATH` | `/opt/rizomtemp` | Caminho do projeto no VPS |
-
-## Gerar chave SSH para o deploy
-
-No seu computador local:
+## Configurar o self-hosted runner no VPS
 
 ```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/rizomtemp_deploy
+mkdir -p ~/actions-runner && cd ~/actions-runner
 ```
 
-Copiar chave pública para o VPS:
+Acesse no GitHub: **Settings → Actions → Runners → New self-hosted runner**
+- Escolha: Linux / x64
+- Cole os comandos `curl` + `tar` + `./config.sh` que o GitHub mostrar
 
 ```bash
-ssh-copy-id -i ~/.ssh/rizomtemp_deploy.pub ubuntu@SEU_VPS_IP
+# Instalar como serviço systemd (inicia automaticamente no boot)
+sudo ./svc.sh install
+sudo ./svc.sh start
 ```
 
-Adicionar no GitHub Secrets:
-- `VPS_SSH_KEY` → conteúdo de `~/.ssh/rizomtemp_deploy` (chave **privada**)
+Pronto — sem secrets, sem SSH.
 
 ## Primeiro deploy (setup inicial no VPS)
 

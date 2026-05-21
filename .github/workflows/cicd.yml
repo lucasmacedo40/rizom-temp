@@ -52,46 +52,33 @@ jobs:
         run: npm run build
         working-directory: frontend
 
-  # ─── Deploy: só roda em push para main ───────────────────────────────────────
+  # ─── Deploy: roda no próprio VPS via self-hosted runner ─────────────────────
   deploy:
     name: Deploy → VPS
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [ci-backend, ci-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd ${{ secrets.VPS_DEPLOY_PATH }}
+      - name: Pull latest code
+        run: git -C /opt/rizomtemp pull origin main
 
-            echo "=== Pulling latest code ==="
-            git pull origin main
+      - name: Install backend dependencies
+        run: npm ci --omit=dev
+        working-directory: /opt/rizomtemp/backend
 
-            echo "=== Installing backend dependencies ==="
-            cd backend
-            npm ci --omit=dev
-            cd ..
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: /opt/rizomtemp/frontend
 
-            echo "=== Building frontend ==="
-            cd frontend
-            npm ci
-            npm run build
-            cd ..
+      - name: Run migrations
+        run: NODE_ENV=production node src/migrations/run.js
+        working-directory: /opt/rizomtemp/backend
 
-            echo "=== Running migrations ==="
-            cd backend
-            NODE_ENV=production node src/migrations/run.js
-            cd ..
+      - name: Restart backend
+        run: pm2 reload rizomtemp-backend --update-env
 
-            echo "=== Restarting backend ==="
-            pm2 reload rizomtemp-backend --update-env
-
-            echo "=== Health check ==="
-            sleep 3
-            curl -sf http://localhost:3000/health && echo "Backend OK" || echo "WARN: health check failed"
+      - name: Health check
+        run: |
+          sleep 3
+          curl -sf http://localhost:3000/health && echo "Backend OK"
