@@ -129,3 +129,75 @@ export const relatoriosApi = {
       responseType: 'blob',
     }),
 };
+
+// ─── Tipos: Configurações ─────────────────────────────────────────────────────
+
+export interface ClienteConfiguracao {
+  id: string;
+  nome: string;
+  cnpj?: string | null;
+  email: string;
+  telefone?: string | null;
+  plano: string;
+  ativo: boolean;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface UsuarioConfiguracao {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: 'admin' | 'operador' | 'visualizador';
+  ativo: boolean;
+  ultimo_login?: string | null;
+  criado_em: string;
+}
+
+export interface AlertasConfiguracao {
+  webhook_configurado: boolean;
+  webhook_mascarado?: string | null;
+  notificacoes_ativas: boolean;
+  timeout_ms: number;
+  atraso_padrao_min: number;
+}
+
+export interface SistemaConfiguracao {
+  backend: {
+    status: string;
+    version: string;
+    node_env: string;
+    server_time: string;
+  };
+  database: { status: string };
+  mqtt: {
+    conectado: boolean;
+    host: string;
+    port: number;
+  };
+  api: {
+    frontend_url?: string | null;
+    report_timezone?: string | null;
+  };
+}
+
+// ─── API: Configurações ───────────────────────────────────────────────────────
+
+export const configuracoesApi = {
+  cliente: () =>
+    api.get<ClienteConfiguracao>('/configuracoes/cliente'),
+  atualizarCliente: (dados: Partial<Pick<ClienteConfiguracao, 'nome' | 'cnpj' | 'email' | 'telefone'>>) =>
+    api.patch<ClienteConfiguracao>('/configuracoes/cliente', dados),
+  usuarios: () =>
+    api.get<UsuarioConfiguracao[]>('/configuracoes/usuarios'),
+  criarUsuario: (dados: { nome: string; email: string; senha: string; perfil: UsuarioConfiguracao['perfil'] }) =>
+    api.post<UsuarioConfiguracao>('/configuracoes/usuarios', dados),
+  atualizarUsuario: (id: string, dados: Partial<Pick<UsuarioConfiguracao, 'nome' | 'perfil' | 'ativo'>> & { senha?: string }) =>
+    api.patch<UsuarioConfiguracao>(`/configuracoes/usuarios/${id}`, dados),
+  alertas: () =>
+    api.get<AlertasConfiguracao>('/configuracoes/alertas'),
+  testarAlertas: () =>
+    api.post<{ ok: boolean; status?: number; erro?: string }>('/configuracoes/alertas/teste'),
+  sistema: () =>
+    api.get<SistemaConfiguracao>('/configuracoes/sistema'),
+};
