@@ -13,12 +13,15 @@ router.get('/:codigo', async (req, res) => {
   }
 
   const { rows } = await db.query(
-    `SELECT cp.equipamento_id, e.device_id
-     FROM codigos_pareamento cp
-     JOIN equipamentos e ON e.id = cp.equipamento_id
-     WHERE cp.codigo = $1
+    `UPDATE codigos_pareamento cp
+     SET usado = TRUE
+     FROM equipamentos e
+     WHERE e.id = cp.equipamento_id
+       AND cp.codigo = $1
        AND cp.usado = FALSE
-       AND cp.expira_em > NOW()`,
+       AND cp.expira_em > NOW()
+       AND e.ativo = TRUE
+     RETURNING cp.equipamento_id, e.device_id`,
     [codigo]
   );
 
@@ -27,12 +30,6 @@ router.get('/:codigo', async (req, res) => {
   }
 
   const equip = rows[0];
-
-  // Marca código como usado
-  await db.query(
-    `UPDATE codigos_pareamento SET usado = TRUE WHERE codigo = $1`,
-    [codigo]
-  );
 
   res.json({
     device_id:    equip.device_id,

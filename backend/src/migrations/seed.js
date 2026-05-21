@@ -1,5 +1,6 @@
 // src/migrations/seed.js
 require('dotenv').config();
+const { validateDatabaseEnv } = require('../config/env');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 
@@ -10,6 +11,8 @@ const CLIENT_NAME = process.env.SEED_CLIENT_NAME || 'Cliente Default';
 const CLIENT_EMAIL = process.env.SEED_CLIENT_EMAIL || 'contato@cliente.com';
 
 async function runSeed() {
+  validateDatabaseEnv();
+
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {

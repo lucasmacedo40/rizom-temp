@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Thermometer, Bell, FileText, LogOut, Settings } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 const navItems = [
   { to: '/',            label: 'Dashboard',    icon: LayoutDashboard },
@@ -36,7 +36,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div style={{ padding: '0 20px 24px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
+              width: 36, height: 36, borderRadius: 8,
               background: 'var(--rizom-blue)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
@@ -51,7 +51,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               </svg>
             </div>
             <div>
-              <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Rizom Temp</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 700, fontSize: 15 }}>Rizom Temp</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Monitoramento</div>
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               key={to} to={to} end={to === '/'}
               style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 10, marginBottom: 2,
+                padding: '10px 12px', borderRadius: 8, marginBottom: 2,
                 fontSize: 14, fontWeight: isActive ? 500 : 400,
                 color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
                 background: isActive ? 'rgba(26,110,255,0.12)' : 'transparent',
@@ -88,7 +88,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             onClick={handleLogout}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              width: '100%', padding: '10px 12px', borderRadius: 10,
+              width: '100%', padding: '10px 12px', borderRadius: 8,
               background: 'transparent', color: 'var(--text-secondary)',
               fontSize: 14, transition: 'all .15s',
             }}

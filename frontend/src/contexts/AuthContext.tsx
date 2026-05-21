@@ -1,24 +1,16 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { authApi } from '../api';
 import type { Usuario } from '../api';
-
-interface AuthCtx {
-  usuario: Usuario | null;
-  loading: boolean;
-  login: (email: string, senha: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthCtx | null>(null);
+import { AuthContext } from './authContextCore';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(localStorage.getItem('token')));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) { setLoading(false); return; }
+    if (!token) return;
     authApi.me()
       .then(r => setUsuario(r.data))
       .catch(() => localStorage.removeItem('token'))
@@ -41,10 +33,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth fora do AuthProvider');
-  return ctx;
 }

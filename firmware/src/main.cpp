@@ -20,7 +20,7 @@
  * │ OLED GND    │ GND    │                              │
  * └─────────────┴────────┴──────────────────────────────┘
  *
- * BIBLIOTECAS NECESSÁRIAS (Arduino IDE → Library Manager):
+ * BIBLIOTECAS NECESSÁRIAS (PlatformIO — lib_deps):
  *   - PubSubClient           (Nick O'Leary)        v2.8+
  *   - OneWire                (Paul Stoffregen)     v2.3+
  *   - DallasTemperature      (Miles Burton)        v3.9+
@@ -28,16 +28,8 @@
  *   - Adafruit GFX Library   (Adafruit)            v1.11+
  *   - ArduinoJson            (Benoit Blanchon)     v7+
  *
- * CONFIGURAÇÃO DA PLACA (Arduino IDE):
- *   Boards Manager URL: https://raw.githubusercontent.com/espressif/
- *                       arduino-esp32/gh-pages/package_esp32_index.json
- *   Placa: "ESP32C3 Dev Module"
- *   USB CDC On Boot: Enabled  ← obrigatório para Serial funcionar
- *   Flash Size: 4MB
- *   Partition Scheme: Default 4MB with spiffs
- *
  * FLUXO DE PRIMEIRO USO:
- *   1. Grave o firmware no ESP32-C3
+ *   1. Grave o firmware no ESP32-C3 via PlatformIO Upload
  *   2. LED pisca rápido → portal ativo
  *   3. Conecte no Wi-Fi "RizomTemp-XXXX" (sem senha)
  *   4. Acesse 192.168.4.1 no navegador

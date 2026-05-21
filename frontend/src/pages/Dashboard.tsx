@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { equipamentosApi, relatoriosApi, alertasApi } from '../api';
 import type { Equipamento, Resumo, Alerta } from '../api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import EquipamentoCard from '../components/EquipamentoCard';
 import { AlertTriangle, Thermometer, Activity, Bell, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,13 +17,13 @@ function MetricCard({
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 16, padding: '20px 24px',
+      borderRadius: 8, padding: '20px 24px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{label}</span>
         <Icon size={18} color={cor} />
       </div>
-      <div style={{ fontFamily: 'Syne', fontSize: 32, fontWeight: 700, color: cor }}>{value}</div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 32, fontWeight: 700, color: cor }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -77,7 +77,7 @@ export default function Dashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
-            Bom dia, {usuario?.nome.split(' ')[0]} 👋
+            Bom dia, {usuario?.nome.split(' ')[0]}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
             {usuario?.cliente_nome} · Monitoramento em tempo real
@@ -88,7 +88,7 @@ export default function Dashboard() {
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'var(--surface)', border: '1px solid var(--border)',
-            color: 'var(--text-secondary)', borderRadius: 10, padding: '8px 14px', fontSize: 13,
+            color: 'var(--text-secondary)', borderRadius: 8, padding: '8px 14px', fontSize: 13,
           }}
         >
           <RefreshCw size={13} />
@@ -98,7 +98,7 @@ export default function Dashboard() {
 
       {/* Métricas */}
       {resumo && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 32 }}>
           <MetricCard
             label="Equipamentos"
             value={resumo.total_equipamentos}
@@ -131,7 +131,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
         {/* Grid de equipamentos */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -158,7 +158,7 @@ export default function Dashboard() {
           <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Alertas recentes</h2>
           <div style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, overflow: 'hidden',
+            borderRadius: 8, overflow: 'hidden',
           }}>
             {alertas.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>

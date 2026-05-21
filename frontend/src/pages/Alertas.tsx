@@ -1,5 +1,5 @@
 // src/pages/Alertas.tsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { alertasApi } from '../api';
 import type { Alerta } from '../api';
 import { AlertTriangle, Check } from 'lucide-react';
@@ -19,13 +19,13 @@ export default function Alertas() {
   const [filtro, setFiltro] = useState<'abertos' | 'todos'>('abertos');
   const [reconhecendo, setReconhecendo] = useState<string | null>(null);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     const { data } = await alertasApi.listar(filtro === 'abertos' ? false : undefined);
     setAlertas(data);
     setLoading(false);
-  }
+  }, [filtro]);
 
-  useEffect(() => { carregar(); }, [filtro]);
+  useEffect(() => { carregar(); }, [carregar]);
 
   async function reconhecer(id: string) {
     setReconhecendo(id);
@@ -52,7 +52,7 @@ export default function Alertas() {
               key={f}
               onClick={() => setFiltro(f)}
               style={{
-                padding: '8px 16px', borderRadius: 10, fontSize: 13,
+                padding: '8px 16px', borderRadius: 8, fontSize: 13,
                 background: filtro === f ? 'var(--rizom-blue)' : 'var(--surface)',
                 color: filtro === f ? 'white' : 'var(--text-secondary)',
                 border: '1px solid var(--border)',
@@ -77,7 +77,7 @@ export default function Alertas() {
       ) : (
         <div style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, overflow: 'hidden',
+          borderRadius: 8, overflow: 'hidden',
         }}>
           {alertas.map((a, i) => (
             <div key={a.id} style={{
@@ -97,7 +97,7 @@ export default function Alertas() {
                     {TIPO_PT[a.tipo] || a.tipo}
                   </span>
                   {a.temperatura && (
-                    <span style={{ fontSize: 12, fontFamily: 'DM Mono', color: 'var(--danger)' }}>
+                    <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--danger)' }}>
                       {Number(a.temperatura).toFixed(1)}°C
                     </span>
                   )}

@@ -127,10 +127,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS tr_equipamentos_updated ON equipamentos;
 CREATE TRIGGER tr_equipamentos_updated
   BEFORE UPDATE ON equipamentos
   FOR EACH ROW EXECUTE FUNCTION trigger_atualiza_timestamp();
 
+DROP TRIGGER IF EXISTS tr_clientes_updated ON clientes;
 CREATE TRIGGER tr_clientes_updated
   BEFORE UPDATE ON clientes
   FOR EACH ROW EXECUTE FUNCTION trigger_atualiza_timestamp();

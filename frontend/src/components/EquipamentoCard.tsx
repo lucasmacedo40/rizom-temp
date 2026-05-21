@@ -17,7 +17,7 @@ const STATUS_CONFIG: Record<StatusEquip, { cor: string; bg: string; label: strin
   ok:       { cor: 'var(--ok)',     bg: 'var(--ok-bg)',     label: 'Normal',   Icon: CheckCircle },
   alerta:   { cor: 'var(--alerta)', bg: 'var(--alerta-bg)', label: 'Alerta',   Icon: AlertTriangle },
   offline:  { cor: 'var(--offline)',bg: 'var(--offline-bg)',label: 'Offline',  Icon: WifiOff },
-  sem_dados:{ cor: 'var(--text-muted)', bg: 'rgba(255,255,255,0.04)', label: 'Sem dados', Icon: Clock },
+  sem_dados:{ cor: 'var(--text-muted)', bg: 'var(--offline-bg)', label: 'Sem dados', Icon: Clock },
 };
 
 interface Props { equip: Equipamento; }
@@ -41,7 +41,7 @@ export default function EquipamentoCard({ equip }: Props) {
       onClick={() => navigate(`/equipamentos/${equip.id}`)}
       style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 20, cursor: 'pointer',
+        borderRadius: 8, padding: 20, cursor: 'pointer',
         transition: 'all .2s',
         position: 'relative', overflow: 'hidden',
       }}
@@ -63,7 +63,7 @@ export default function EquipamentoCard({ equip }: Props) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <div style={{ fontFamily: 'Syne', fontWeight: 600, fontSize: 15, marginBottom: 2 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 15, marginBottom: 2 }}>
             {equip.nome}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
@@ -72,7 +72,7 @@ export default function EquipamentoCard({ equip }: Props) {
         </div>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 5,
-          background: bg, padding: '4px 10px', borderRadius: 20,
+          background: bg, padding: '4px 10px', borderRadius: 8,
           fontSize: 12, color: cor, fontWeight: 500,
         }}>
           <Icon size={12} />
@@ -82,7 +82,7 @@ export default function EquipamentoCard({ equip }: Props) {
 
       {/* Temperatura */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 12 }}>
-        <span style={{ fontFamily: 'DM Mono', fontSize: 36, fontWeight: 400, color: cor }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 36, fontWeight: 400, color: cor }}>
           {equip.ultima_temperatura != null ? Number(equip.ultima_temperatura).toFixed(1) : '—'}
         </span>
         <span style={{ fontSize: 16, color: 'var(--text-secondary)' }}>°C</span>

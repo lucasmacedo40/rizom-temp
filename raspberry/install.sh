@@ -60,7 +60,9 @@ id -u rizomtemp &>/dev/null || useradd -r -s /bin/false -d "$INSTALL_DIR" rizomt
 
 # ─── 3. Código do projeto ─────────────────────────────────────────────────────
 log "Instalando código do projeto em $INSTALL_DIR..."
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "/tmp/rizom-source/rizom-temp" ]; then
+  cp -r /tmp/rizom-source/rizom-temp "$INSTALL_DIR"
+elif [ -d "$INSTALL_DIR" ]; then
   cd "$INSTALL_DIR" && git pull -q
 else
   git clone -q "$REPO_URL" "$INSTALL_DIR"

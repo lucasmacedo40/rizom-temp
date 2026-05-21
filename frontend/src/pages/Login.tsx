@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 
 export default function Login() {
   const { login } = useAuth();
@@ -40,7 +40,7 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 56, height: 56, borderRadius: 16,
+            width: 56, height: 56, borderRadius: 8,
             background: 'var(--rizom-blue)', marginBottom: 16,
           }}>
             <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
@@ -52,7 +52,7 @@ export default function Login() {
               <line x1="6" y1="20" x2="22" y2="20" stroke="white" strokeWidth="1.5" opacity=".3"/>
             </svg>
           </div>
-          <h1 style={{ fontFamily: 'Syne', fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px' }}>
+          <h1 style={{ fontFamily: 'var(--font-sans)', fontSize: 24, fontWeight: 700, letterSpacing: 0 }}>
             Rizom Temp
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>
@@ -61,7 +61,7 @@ export default function Login() {
         </div>
         <div style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 20, padding: 32,
+          borderRadius: 8, padding: 32,
         }}>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
@@ -72,7 +72,7 @@ export default function Login() {
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                 required autoFocus
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: 12,
+                  width: '100%', padding: '12px 16px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-primary)', fontSize: 15, transition: 'border-color .2s',
                 }}
@@ -88,7 +88,7 @@ export default function Login() {
                 type="password" value={senha} onChange={e => setSenha(e.target.value)}
                 required
                 style={{
-                  width: '100%', padding: '12px 16px', borderRadius: 12,
+                  width: '100%', padding: '12px 16px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-primary)', fontSize: 15, transition: 'border-color .2s',
                 }}
@@ -99,7 +99,7 @@ export default function Login() {
             {erro && (
               <div style={{
                 background: 'var(--danger-bg)', border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16,
                 color: 'var(--danger)', fontSize: 13,
               }}>
                 {erro}
@@ -110,7 +110,7 @@ export default function Login() {
               style={{
                 width: '100%', padding: '13px',
                 background: loading ? 'var(--surface-2)' : 'var(--rizom-blue)',
-                color: 'white', borderRadius: 12, fontFamily: 'Syne',
+                color: 'white', borderRadius: 8, fontFamily: 'var(--font-sans)',
                 fontWeight: 600, fontSize: 15, transition: 'all .2s',
                 opacity: loading ? 0.7 : 1,
               }}

@@ -35,18 +35,18 @@ export default function Relatorios() {
       {/* Card de geração */}
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 20, padding: 28, maxWidth: 480,
+        borderRadius: 8, padding: 28, maxWidth: 480,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 8,
             background: 'rgba(26,110,255,0.12)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <FileText size={20} color="var(--rizom-blue)" />
           </div>
           <div>
-            <div style={{ fontFamily: 'Syne', fontWeight: 600, fontSize: 15 }}>Relatório mensal</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 15 }}>Relatório mensal</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>PDF com histórico completo de temperaturas</div>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default function Relatorios() {
             onChange={e => setMes(e.target.value)}
             max={format(new Date(), 'yyyy-MM')}
             style={{
-              padding: '11px 14px', borderRadius: 10, fontSize: 14,
+              padding: '11px 14px', borderRadius: 8, fontSize: 14,
               background: 'var(--surface-2)', border: '1px solid var(--border)',
               color: 'var(--text-primary)',
             }}
@@ -68,7 +68,7 @@ export default function Relatorios() {
         </div>
 
         <div style={{
-          background: 'rgba(26,110,255,0.06)', borderRadius: 10,
+          background: 'rgba(26,110,255,0.06)', borderRadius: 8,
           padding: '12px 16px', marginBottom: 20, fontSize: 12,
           color: 'var(--text-secondary)',
         }}>
@@ -82,7 +82,7 @@ export default function Relatorios() {
             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 8, padding: '12px',
             background: gerando ? 'var(--surface-2)' : 'var(--rizom-blue)',
-            color: 'white', borderRadius: 12, fontWeight: 500, fontSize: 15,
+            color: 'white', borderRadius: 8, fontWeight: 500, fontSize: 15,
             opacity: gerando ? 0.7 : 1, transition: 'all .2s',
           }}
         >
@@ -94,9 +94,9 @@ export default function Relatorios() {
       {/* Info ANVISA */}
       <div style={{
         marginTop: 24, background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 24, maxWidth: 480,
+        borderRadius: 8, padding: 24, maxWidth: 480,
       }}>
-        <h3 style={{ fontFamily: 'Syne', fontSize: 14, marginBottom: 16 }}>
+        <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: 14, marginBottom: 16 }}>
           Faixas de temperatura ANVISA RDC 216/2004
         </h3>
         {[
@@ -112,7 +112,7 @@ export default function Relatorios() {
             fontSize: 13,
           }}>
             <span style={{ color: 'var(--text-secondary)' }}>{tipo}</span>
-            <span style={{ fontFamily: 'DM Mono', color: 'var(--rizom-iris)' }}>{faixa}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--rizom-iris)' }}>{faixa}</span>
           </div>
         ))}
       </div>

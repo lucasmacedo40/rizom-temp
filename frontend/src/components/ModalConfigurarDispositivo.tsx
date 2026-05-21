@@ -1,5 +1,5 @@
 // src/components/ModalConfigurarDispositivo.tsx
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Wifi, Copy, RefreshCw, CheckCircle } from 'lucide-react';
 import { equipamentosApi } from '../api';
 import type { CodigoPareamento } from '../api';
@@ -16,7 +16,7 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
   const [copiado, setCopiado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  async function gerarCodigo() {
+  const gerarCodigo = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
@@ -29,9 +29,9 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
     } finally {
       setLoading(false);
     }
-  }
+  }, [equipamentoId]);
 
-  useEffect(() => { gerarCodigo(); }, []);
+  useEffect(() => { gerarCodigo(); }, [gerarCodigo]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -65,7 +65,7 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.28)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
       }}
       onClick={onFechar}
@@ -73,13 +73,13 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
       <div
         style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 20, padding: 28, width: 440,
+          borderRadius: 8, padding: 28, width: 440,
         }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontFamily: 'Syne', fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: 17, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Wifi size={18} /> Configurar dispositivo
           </h3>
           <button
@@ -114,7 +114,7 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
         ) : erro ? (
           <div style={{
             background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 12, padding: 16, textAlign: 'center',
+            borderRadius: 8, padding: 16, textAlign: 'center',
             color: '#ef4444', fontSize: 14, marginBottom: 12,
           }}>
             {erro}
@@ -136,11 +136,11 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
             <div style={{
               background: 'var(--surface-2)',
               border: `2px solid ${expirado ? '#ef4444' : 'var(--rizom-blue)'}`,
-              borderRadius: 16, padding: '20px', textAlign: 'center', marginBottom: 12,
+              borderRadius: 8, padding: '20px', textAlign: 'center', marginBottom: 12,
             }}>
               <div style={{
-                fontSize: 48, fontWeight: 800, letterSpacing: 12,
-                fontFamily: 'monospace',
+                fontSize: 48, fontWeight: 800, letterSpacing: 0,
+                fontFamily: 'var(--font-mono)',
                 color: expirado ? '#ef4444' : 'var(--text-primary)',
                 marginBottom: 8,
               }}>
@@ -155,7 +155,7 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
               <button
                 onClick={copiar}
                 style={{
-                  flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                  flex: 1, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500,
                   background: copiado ? 'rgba(5,150,105,0.1)' : 'var(--surface-2)',
                   border: `1px solid ${copiado ? '#059669' : 'var(--border)'}`,
                   color: copiado ? '#059669' : 'var(--text-secondary)',
@@ -172,7 +172,7 @@ export default function ModalConfigurarDispositivo({ equipamentoId, onFechar }: 
                 onClick={gerarCodigo}
                 disabled={loading}
                 style={{
-                  flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+                  flex: 1, padding: '10px', borderRadius: 8, fontSize: 13, fontWeight: 500,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-secondary)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

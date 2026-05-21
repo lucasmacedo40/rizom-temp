@@ -14,11 +14,26 @@ const TIPOS = [
   { value: 'outro', label: 'Outro', limites: '—' },
 ];
 
+type FormEquipamento = {
+  nome: string;
+  tipo: string;
+  localizacao: string;
+};
+
+const CAMPOS_TEXTO: Array<{
+  label: string;
+  key: keyof Pick<FormEquipamento, 'nome' | 'localizacao'>;
+  placeholder: string;
+}> = [
+  { label: 'Nome do equipamento *', key: 'nome', placeholder: 'Ex: Câmara Fria 1' },
+  { label: 'Localização', key: 'localizacao', placeholder: 'Ex: Cozinha - fundo esquerdo' },
+];
+
 export default function Equipamentos() {
   const [lista, setLista] = useState<Equipamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<{ nome: string; tipo: string; localizacao: string }>({ nome: '', tipo: 'refrigerador', localizacao: '' });
+  const [form, setForm] = useState<FormEquipamento>({ nome: '', tipo: 'refrigerador', localizacao: '' });
   const [salvando, setSalvando] = useState(false);
   const [equipCriado, setEquipCriado] = useState<string | null>(null);
 
@@ -60,7 +75,7 @@ export default function Equipamentos() {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'var(--rizom-blue)', color: 'white',
-            borderRadius: 12, padding: '10px 18px', fontSize: 14, fontWeight: 500,
+            borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 500,
           }}
         >
           <Plus size={16} /> Adicionar equipamento
@@ -78,38 +93,35 @@ export default function Equipamentos() {
       {/* Modal */}
       {showModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.28)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
         }} onClick={() => setShowModal(false)}>
           <div
             style={{
               background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 20, padding: 28, width: 420,
+              borderRadius: 8, padding: 28, width: 420,
             }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
-              <h3 style={{ fontFamily: 'Syne', fontSize: 17 }}>Novo equipamento</h3>
+              <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: 17 }}>Novo equipamento</h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
                 <X size={18} />
               </button>
             </div>
 
-            {[
-              { label: 'Nome do equipamento *', key: 'nome', placeholder: 'Ex: Câmara Fria 1' },
-              { label: 'Localização', key: 'localizacao', placeholder: 'Ex: Cozinha - fundo esquerdo' },
-            ].map(({ label, key, placeholder }) => (
+            {CAMPOS_TEXTO.map(({ label, key, placeholder }) => (
               <div key={key} style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                   {label}
                 </label>
                 <input
                   type="text"
-                  value={(form as any)[key]}
+                  value={form[key]}
                   onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                   placeholder={placeholder}
                   style={{
-                    width: '100%', padding: '11px 14px', borderRadius: 10,
+                    width: '100%', padding: '11px 14px', borderRadius: 8,
                     background: 'var(--surface-2)', border: '1px solid var(--border)',
                     color: 'var(--text-primary)', fontSize: 14,
                   }}
@@ -125,7 +137,7 @@ export default function Equipamentos() {
                 value={form.tipo}
                 onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
                 style={{
-                  width: '100%', padding: '11px 14px', borderRadius: 10,
+                  width: '100%', padding: '11px 14px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-primary)', fontSize: 14,
                 }}
@@ -146,7 +158,7 @@ export default function Equipamentos() {
               <button
                 onClick={() => setShowModal(false)}
                 style={{
-                  flex: 1, padding: '11px', borderRadius: 10,
+                  flex: 1, padding: '11px', borderRadius: 8,
                   background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 14,
                 }}
               >
@@ -155,7 +167,7 @@ export default function Equipamentos() {
               <button
                 onClick={criar} disabled={!form.nome || salvando}
                 style={{
-                  flex: 1, padding: '11px', borderRadius: 10, fontWeight: 500,
+                  flex: 1, padding: '11px', borderRadius: 8, fontWeight: 500,
                   background: 'var(--rizom-blue)', color: 'white', fontSize: 14,
                   opacity: (!form.nome || salvando) ? 0.6 : 1,
                 }}

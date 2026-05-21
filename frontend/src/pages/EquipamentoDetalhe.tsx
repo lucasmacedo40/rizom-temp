@@ -72,7 +72,7 @@ export default function EquipamentoDetalhe() {
     return (
       <div style={{
         background: 'var(--surface-2)', border: '1px solid var(--border)',
-        borderRadius: 10, padding: '10px 14px', fontSize: 12,
+        borderRadius: 8, padding: '10px 14px', fontSize: 12,
       }}>
         <div style={{ color: 'var(--text-secondary)', marginBottom: 6 }}>
           {label ? formatarX(label) : ''}
@@ -109,7 +109,7 @@ export default function EquipamentoDetalhe() {
           onClick={() => navigate(-1)}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 36, height: 36, borderRadius: 10,
+            width: 36, height: 36, borderRadius: 8,
             background: 'var(--surface)', border: '1px solid var(--border)',
             color: 'var(--text-secondary)',
           }}
@@ -128,7 +128,7 @@ export default function EquipamentoDetalhe() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--surface)', border: '1px solid var(--border)',
-              color: 'var(--text-secondary)', borderRadius: 10, padding: '8px 14px', fontSize: 13,
+              color: 'var(--text-secondary)', borderRadius: 8, padding: '8px 14px', fontSize: 13,
               cursor: 'pointer',
             }}
           >
@@ -139,7 +139,7 @@ export default function EquipamentoDetalhe() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--surface)', border: '1px solid var(--border)',
-              color: 'var(--text-secondary)', borderRadius: 10, padding: '8px 14px', fontSize: 13,
+              color: 'var(--text-secondary)', borderRadius: 8, padding: '8px 14px', fontSize: 13,
             }}
           >
             <Plus size={13} /> Registro manual
@@ -149,7 +149,7 @@ export default function EquipamentoDetalhe() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--rizom-blue)', color: 'white',
-              borderRadius: 10, padding: '8px 14px', fontSize: 13,
+              borderRadius: 8, padding: '8px 14px', fontSize: 13,
             }}
           >
             <RefreshCw size={13} /> Atualizar
@@ -161,10 +161,10 @@ export default function EquipamentoDetalhe() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
         <div style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: '20px 24px',
+          borderRadius: 8, padding: '20px 24px',
         }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Temperatura atual</div>
-          <div style={{ fontFamily: 'DM Mono', fontSize: 40, fontWeight: 400, color: statusCor }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 40, fontWeight: 400, color: statusCor }}>
             {ultimaTemp != null ? `${Number(ultimaTemp).toFixed(1)}°C` : '—'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
@@ -179,10 +179,10 @@ export default function EquipamentoDetalhe() {
         ] as { label: string; val: string | number }[]).map(({ label, val }) => (
           <div key={label} style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 16, padding: '20px 24px',
+            borderRadius: 8, padding: '20px 24px',
           }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{label}</div>
-            <div style={{ fontFamily: 'Syne', fontSize: 28, fontWeight: 700 }}>{val}</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 28, fontWeight: 700 }}>{val}</div>
           </div>
         ))}
       </div>
@@ -190,7 +190,7 @@ export default function EquipamentoDetalhe() {
       {/* Gráfico */}
       <div style={{
         background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 24, marginBottom: 24,
+        borderRadius: 8, padding: 24, marginBottom: 24,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontSize: 15, fontWeight: 600 }}>Histórico de temperatura</h2>
@@ -215,7 +215,7 @@ export default function EquipamentoDetalhe() {
 
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={dados} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis
               dataKey="minuto"
               tickFormatter={formatarX}
@@ -248,14 +248,14 @@ export default function EquipamentoDetalhe() {
       {/* Modal registro manual */}
       {showManual && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.28)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
         }} onClick={() => setShowManual(false)}>
           <div style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 20, padding: 28, width: 360,
+            borderRadius: 8, padding: 28, width: 360,
           }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontFamily: 'Syne', marginBottom: 20 }}>Registro manual</h3>
+            <h3 style={{ fontFamily: 'var(--font-sans)', marginBottom: 20 }}>Registro manual</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                 Temperatura (°C)
@@ -263,7 +263,7 @@ export default function EquipamentoDetalhe() {
               <input type="number" step="0.1" value={tempManual}
                 onChange={e => setTempManual(e.target.value)} autoFocus
                 style={{
-                  width: '100%', padding: '11px 14px', borderRadius: 10,
+                  width: '100%', padding: '11px 14px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-primary)', fontSize: 15,
                 }}
@@ -276,7 +276,7 @@ export default function EquipamentoDetalhe() {
               <input type="text" value={obsManual}
                 onChange={e => setObsManual(e.target.value)}
                 style={{
-                  width: '100%', padding: '11px 14px', borderRadius: 10,
+                  width: '100%', padding: '11px 14px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
                   color: 'var(--text-primary)', fontSize: 14,
                 }}
@@ -284,11 +284,11 @@ export default function EquipamentoDetalhe() {
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setShowManual(false)} style={{
-                flex: 1, padding: '11px', borderRadius: 10,
+                flex: 1, padding: '11px', borderRadius: 8,
                 background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 14,
               }}>Cancelar</button>
               <button onClick={registrarManual} disabled={!tempManual || salvando} style={{
-                flex: 1, padding: '11px', borderRadius: 10,
+                flex: 1, padding: '11px', borderRadius: 8,
                 background: 'var(--rizom-blue)', color: 'white', fontSize: 14,
                 opacity: (!tempManual || salvando) ? 0.6 : 1,
               }}>
