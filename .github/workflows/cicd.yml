@@ -52,33 +52,54 @@ jobs:
         run: npm run build
         working-directory: frontend
 
-  # ─── Deploy: roda no próprio VPS via self-hosted runner ─────────────────────
+  # ─── Build e push das imagens Docker → GHCR ──────────────────────────────────
+  build-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [ci-backend, ci-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/lucasmacedo40/rizomtemp-backend:latest
+
+      - name: Build e push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ghcr.io/lucasmacedo40/rizomtemp-frontend:latest
+
+  # ─── Deploy: self-hosted runner no VPS ───────────────────────────────────────
   deploy:
     name: Deploy → VPS
     runs-on: self-hosted
-    needs: [ci-backend, ci-frontend]
+    needs: [build-push]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Pull latest code
-        run: git -C /opt/rizomtemp pull origin main
-
-      - name: Install backend dependencies
-        run: npm ci --omit=dev
-        working-directory: /opt/rizomtemp/backend
-
-      - name: Build frontend
-        run: npm ci && npm run build
-        working-directory: /opt/rizomtemp/frontend
-
-      - name: Run migrations
-        run: NODE_ENV=production node src/migrations/run.js
-        working-directory: /opt/rizomtemp/backend
-
-      - name: Restart backend
-        run: sudo systemctl restart rizomtemp-backend
-
-      - name: Health check
+      - name: Pull imagens atualizadas
         run: |
-          sleep 3
-          curl -sf http://localhost:3000/health && echo "Backend OK"
+          docker pull ghcr.io/lucasmacedo40/rizomtemp-backend:latest
+          docker pull ghcr.io/lucasmacedo40/rizomtemp-frontend:latest
+
+      - name: Deploy stack
+        run: |
+          export $(cat /opt/rizomtemp/.env | grep -v '^#' | grep '=' | xargs)
+          docker stack deploy -c /opt/rizomtemp/docker/stack.yml rizomtemp --with-registry-auth
