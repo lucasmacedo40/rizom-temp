@@ -623,7 +623,10 @@ void setup() {
     estado = PROVISIONANDO;
   } else {
     conectarMQTT();
-    publicarTemp(lerTemp());
+    iniciarPortalSTA();
+    float t = lerTemp();
+    if (!isnan(t)) pushLeitura(t);
+    publicarTemp(t);
     publicarHeartbeat();
     tsLeitura = tsHB = millis();
     estado = OPERANDO;
@@ -667,10 +670,15 @@ void loop() {
   mqtt.loop();
   ledOn();
 
+  portal.handleClient();
+
   unsigned long intervaloMs = (unsigned long)cfg.intervalo * 1000UL;
   if (agora - tsLeitura >= intervaloMs) {
     float t = lerTemp();
-    if (!isnan(t) && mqtt.connected()) publicarTemp(t);
+    if (!isnan(t)) {
+      pushLeitura(t);
+      if (mqtt.connected()) publicarTemp(t);
+    }
     tsLeitura = agora;
   }
   if (agora - tsHB >= 120000UL) {
