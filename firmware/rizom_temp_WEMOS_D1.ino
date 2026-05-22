@@ -21,7 +21,7 @@
  *   - PubSubClient           (Nick O'Leary)        v2.8+
  *   - OneWire                (Paul Stoffregen)     v2.3+
  *   - DallasTemperature      (Miles Burton)        v3.9+
- *   - ArduinoJson            (Benoit Blanchon)     v7+
+ *   - ArduinoJson            (Benoit Blanchon)     v6.x (NÃO v7)
  *   (EEPROM é built-in no core ESP8266 — não precisa instalar)
  *
  * PLACA: "LOLIN(WEMOS) D1 R2 & mini" — em Arduino IDE
@@ -241,7 +241,7 @@ void iniciarPortal() {
       return;
     }
 
-    JsonDocument doc;
+    StaticJsonDocument<256> doc;
     DeserializationError err = deserializeJson(doc, portalServer.arg("plain"));
     if (err) {
       portalServer.send(400, "application/json", "{\"erro\":\"json invalido\"}");
@@ -428,7 +428,7 @@ bool buscarConfigRemota() {
   String body = http.getString();
   http.end();
 
-  JsonDocument doc;
+  StaticJsonDocument<256> doc;
   DeserializationError err = deserializeJson(doc, body);
   if (err) {
     Serial.println("[Prov] JSON inválido.");
