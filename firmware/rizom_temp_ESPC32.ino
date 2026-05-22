@@ -62,7 +62,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
-#define PROVISIONING_URL "https://temp.rizomtag.com.br/provisioning/"
+#define PROVISIONING_URL "https://temp.rizom.com.br/provisioning/"
 
 // ─── Pinos ────────────────────────────────────────────────────
 #define PIN_DS18B20   2    // DS18B20 data

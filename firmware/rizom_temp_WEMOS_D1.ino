@@ -1,35 +1,33 @@
 /*
  * ╔══════════════════════════════════════════════════════╗
  * ║  Rizom Temp — Firmware v2.0                          ║
- * ║  Hardware: ESP32-C3 Super Mini                       ║
+ * ║  Hardware: Wemos D1 Mini (ESP8266)                   ║
  * ║  Sensor:   DS18B20 (1-Wire)                          ║
- * ║  Display:  OLED 0.96" I2C (SSD1306 128x64)          ║
  * ║  Config:   Captive Portal Wi-Fi                      ║
  * ╚══════════════════════════════════════════════════════╝
  *
- * PINAGEM — ESP32-C3 Super Mini:
+ * PINAGEM — Wemos D1 Mini:
  * ┌─────────────┬────────┬──────────────────────────────┐
  * │ Componente  │ Pino   │ Observação                   │
  * ├─────────────┼────────┼──────────────────────────────┤
- * │ DS18B20 DAT │ GPIO2  │ Pull-up 4.7kΩ para 3.3V      │
+ * │ DS18B20 DAT │ D5     │ GPIO14 — Pull-up 4.7kΩ/3.3V  │
  * │ DS18B20 VCC │ 3.3V   │                              │
  * │ DS18B20 GND │ GND    │                              │
- * │ OLED SDA    │ GPIO8  │ I2C padrão do C3 Super Mini  │
- * │ OLED SCL    │ GPIO9  │                              │
- * │ OLED VCC    │ 3.3V   │                              │
- * │ OLED GND    │ GND    │                              │
+ * │ LED interno │ D4     │ GPIO2 — ativo em LOW         │
+ * │ Botão reset │ D3     │ GPIO0 — botão FLASH (BOOT)   │
  * └─────────────┴────────┴──────────────────────────────┘
  *
- * BIBLIOTECAS NECESSÁRIAS (PlatformIO — lib_deps):
+ * BIBLIOTECAS NECESSÁRIAS (Gerenciador de Bibliotecas Arduino):
  *   - PubSubClient           (Nick O'Leary)        v2.8+
  *   - OneWire                (Paul Stoffregen)     v2.3+
  *   - DallasTemperature      (Miles Burton)        v3.9+
- *   - Adafruit SSD1306       (Adafruit)            v2.5+
- *   - Adafruit GFX Library   (Adafruit)            v1.11+
  *   - ArduinoJson            (Benoit Blanchon)     v7+
  *
+ * PLACA: "LOLIN(WEMOS) D1 R2 & mini" — em Arduino IDE
+ * ou "d1_mini" — em PlatformIO (platform = espressif8266)
+ *
  * FLUXO DE PRIMEIRO USO:
- *   1. Grave o firmware no ESP32-C3 via PlatformIO Upload
+ *   1. Grave o firmware via USB
  *   2. LED pisca rápido → portal ativo
  *   3. Conecte no Wi-Fi "RizomTemp-XXXX" (sem senha)
  *   4. Acesse 192.168.4.1 no navegador
@@ -37,253 +35,131 @@
  *   6. Dispositivo reinicia e conecta automaticamente
  *
  * RESET DE CONFIGURAÇÕES:
- *   Mantenha GPIO3 (botão BOOT do C3 Super Mini) pressionado
- *   por 5 segundos → configurações apagadas → portal reabre
+ *   Mantenha D3 (botão FLASH) pressionado por 5 segundos
+ *   → configurações apagadas → portal reabre
  */
 
-#include <WiFi.h>
-#include <WebServer.h>
-#include <Preferences.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <LittleFS.h>
 #include <PubSubClient.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <WiFiClientSecure.h>
 
 #define PROVISIONING_URL "https://temp.rizom.com.br/provisioning/"
 
 // ─── Pinos ────────────────────────────────────────────────────
-#define PIN_DS18B20   2    // DS18B20 data
-#define PIN_SDA       8    // OLED SDA
-#define PIN_SCL       9    // OLED SCL
-#define PIN_LED       8    // LED interno do C3 Super Mini (ativo em LOW)
-#define PIN_BOOT      9    // Botão BOOT para reset (GPIO9 no C3 Super Mini)
-
-// ─── OLED ─────────────────────────────────────────────────────
-#define OLED_W   128
-#define OLED_H   64
-#define OLED_ADDR 0x3C
+#define PIN_DS18B20   14   // D5 — DS18B20 data
+#define PIN_LED        2   // D4 — LED interno (ativo em LOW)
+#define PIN_BOOT       0   // D3 — botão FLASH para reset
 
 // ─── Tempos ───────────────────────────────────────────────────
-#define INTERVALO_LEITURA_MS   60000UL   // leitura a cada 60s
-#define INTERVALO_HEARTBEAT_MS 120000UL  // heartbeat a cada 2min
-#define INTERVALO_DISPLAY_MS   5000UL    // ciclo de tela a cada 5s
-#define TIMEOUT_PORTAL_MS      300000UL  // portal fecha após 5min sem config
-#define HOLD_RESET_MS          5000UL    // segurar 5s para resetar config
+#define INTERVALO_LEITURA_MS   60000UL
+#define INTERVALO_HEARTBEAT_MS 120000UL
+#define TIMEOUT_PORTAL_MS      300000UL
+#define HOLD_RESET_MS          5000UL
 
 // ─── Objetos ──────────────────────────────────────────────────
 OneWire           oneWire(PIN_DS18B20);
 DallasTemperature sensors(&oneWire);
-Adafruit_SSD1306  oled(OLED_W, OLED_H, &Wire, -1);
-WebServer         portalServer(80);
+ESP8266WebServer  portalServer(80);
 WiFiClient        wifiClient;
 PubSubClient      mqtt(wifiClient);
-Preferences       prefs;
 
-// ─── Configurações (salvas em NVS) ───────────────────────────
+// ─── Configurações (salvas em LittleFS) ──────────────────────
 struct Config {
-  char wifiSSID[64]     = "";
-  char wifiSenha[64]    = "";
-  char mqttHost[128]    = "";
-  int  mqttPort         = 1883;
-  char mqttUser[64]     = "";
-  char mqttSenha[64]    = "";
-  char deviceId[32]     = "";
-  int  intervaloSeg     = 60;
-  char codigo[7]        = "";
+  char wifiSSID[64]  = "";
+  char wifiSenha[64] = "";
+  char mqttHost[128] = "";
+  int  mqttPort      = 1883;
+  char mqttUser[64]  = "";
+  char mqttSenha[64] = "";
+  char deviceId[32]  = "";
+  int  intervaloSeg  = 60;
+  char codigo[7]     = "";
 } cfg;
 
 // ─── Estado ───────────────────────────────────────────────────
-enum Estado { PORTAL, CONECTANDO, PROVISIONANDO, OPERANDO, ERRO };
+enum Estado { PORTAL, CONECTANDO, PROVISIONANDO, OPERANDO };
 Estado estado = PORTAL;
 
-float     ultimaTemp        = NAN;
-bool      sensorOk          = false;
-bool      mqttConectado     = false;
-int       errosConsecutivos = 0;
-uint8_t   displayTela       = 0;
+float  ultimaTemp        = NAN;
+bool   sensorOk          = false;
+bool   mqttConectado     = false;
+int    errosConsecutivos = 0;
 
 unsigned long tsUltimaLeitura   = 0;
 unsigned long tsUltimoHeartbeat = 0;
-unsigned long tsUltimoDisplay   = 0;
 unsigned long tsInicioPortal    = 0;
 unsigned long tsBootPressionado = 0;
 bool          bootPressionado   = false;
 
-String deviceMac;  // últimos 6 chars do MAC
+unsigned long tsLed   = 0;
+bool          ledState = false;
+
+String deviceMac;
 
 // ═══════════════════════════════════════════════════════════════
-//  PERSISTÊNCIA — NVS (Non-Volatile Storage)
+//  PERSISTÊNCIA — LittleFS
 // ═══════════════════════════════════════════════════════════════
 void salvarConfig() {
-  prefs.begin("rizom", false);
-  prefs.putString("ssid",      cfg.wifiSSID);
-  prefs.putString("pass",      cfg.wifiSenha);
-  prefs.putString("mqttHost",  cfg.mqttHost);
-  prefs.putInt   ("mqttPort",  cfg.mqttPort);
-  prefs.putString("mqttUser",  cfg.mqttUser);
-  prefs.putString("mqttPass",  cfg.mqttSenha);
-  prefs.putString("deviceId",  cfg.deviceId);
-  prefs.putInt   ("intervalo", cfg.intervaloSeg);
-  prefs.putString("codigo",    cfg.codigo);
-  prefs.end();
-  Serial.println("[NVS] Config salva.");
+  File f = LittleFS.open("/config.json", "w");
+  if (!f) {
+    Serial.println("[FS] Erro ao abrir config.json para escrita.");
+    return;
+  }
+
+  JsonDocument doc;
+  doc["ssid"]        = cfg.wifiSSID;
+  doc["pass"]        = cfg.wifiSenha;
+  doc["mqttHost"]    = cfg.mqttHost;
+  doc["mqttPort"]    = cfg.mqttPort;
+  doc["mqttUser"]    = cfg.mqttUser;
+  doc["mqttPass"]    = cfg.mqttSenha;
+  doc["deviceId"]    = cfg.deviceId;
+  doc["intervalo"]   = cfg.intervaloSeg;
+  doc["codigo"]      = cfg.codigo;
+
+  serializeJson(doc, f);
+  f.close();
+  Serial.println("[FS] Config salva.");
 }
 
 bool carregarConfig() {
-  prefs.begin("rizom", true);
-  String ssid = prefs.getString("ssid", "");
-  if (ssid.isEmpty()) { prefs.end(); return false; }
-  ssid.toCharArray(cfg.wifiSSID, sizeof(cfg.wifiSSID));
-  prefs.getString("pass",      "").toCharArray(cfg.wifiSenha, sizeof(cfg.wifiSenha));
-  prefs.getString("mqttHost",  "").toCharArray(cfg.mqttHost,  sizeof(cfg.mqttHost));
-  cfg.mqttPort = prefs.getInt("mqttPort", 1883);
-  prefs.getString("mqttUser",  "").toCharArray(cfg.mqttUser,  sizeof(cfg.mqttUser));
-  prefs.getString("mqttPass",  "").toCharArray(cfg.mqttSenha, sizeof(cfg.mqttSenha));
-  prefs.getString("deviceId",  "").toCharArray(cfg.deviceId,  sizeof(cfg.deviceId));
-  cfg.intervaloSeg = prefs.getInt("intervalo", 60);
-  prefs.getString("codigo", "").toCharArray(cfg.codigo, sizeof(cfg.codigo));
-  prefs.end();
+  File f = LittleFS.open("/config.json", "r");
+  if (!f) return false;
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err) {
+    Serial.printf("[FS] JSON inválido: %s\n", err.c_str());
+    return false;
+  }
+
+  const char* ssid = doc["ssid"] | "";
+  if (strlen(ssid) == 0) return false;
+
+  strlcpy(cfg.wifiSSID,  doc["ssid"]      | "", sizeof(cfg.wifiSSID));
+  strlcpy(cfg.wifiSenha, doc["pass"]      | "", sizeof(cfg.wifiSenha));
+  strlcpy(cfg.mqttHost,  doc["mqttHost"]  | "", sizeof(cfg.mqttHost));
+  cfg.mqttPort     = doc["mqttPort"]  | 1883;
+  strlcpy(cfg.mqttUser,  doc["mqttUser"]  | "", sizeof(cfg.mqttUser));
+  strlcpy(cfg.mqttSenha, doc["mqttPass"]  | "", sizeof(cfg.mqttSenha));
+  strlcpy(cfg.deviceId,  doc["deviceId"]  | "", sizeof(cfg.deviceId));
+  cfg.intervaloSeg = doc["intervalo"]  | 60;
+  strlcpy(cfg.codigo,    doc["codigo"]    | "", sizeof(cfg.codigo));
+
   return true;
 }
 
 void apagarConfig() {
-  prefs.begin("rizom", false);
-  prefs.clear();
-  prefs.end();
-  Serial.println("[NVS] Config apagada — resetando...");
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  OLED — TELAS
-// ═══════════════════════════════════════════════════════════════
-void oledLimpar() { oled.clearDisplay(); }
-void oledAtualizar() { oled.display(); }
-
-void telaTemperatura() {
-  oledLimpar();
-
-  // Cabeçalho
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-  oled.setCursor(0, 0);
-  oled.print("RIZOM TEMP");
-  oled.setCursor(80, 0);
-  oled.print(mqttConectado ? "MQTT OK" : "sem MQTT");
-
-  // Linha separadora
-  oled.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-  if (sensorOk && !isnan(ultimaTemp)) {
-    // Temperatura grande
-    oled.setTextSize(3);
-    oled.setCursor(8, 16);
-    if (ultimaTemp < 0) {
-      oled.print(ultimaTemp, 1);
-    } else {
-      oled.print(" ");
-      oled.print(ultimaTemp, 1);
-    }
-    // Unidade
-    oled.setTextSize(2);
-    oled.setCursor(100, 18);
-    oled.print("*C");
-  } else {
-    oled.setTextSize(2);
-    oled.setCursor(16, 22);
-    oled.print("SEM SENSOR");
-  }
-
-  // Rodapé
-  oled.drawLine(0, 53, 127, 53, SSD1306_WHITE);
-  oled.setTextSize(1);
-  oled.setCursor(0, 56);
-  oled.print(cfg.deviceId[0] ? cfg.deviceId : deviceMac.c_str());
-
-  oledAtualizar();
-}
-
-void telaStatus() {
-  oledLimpar();
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-
-  oled.setCursor(0, 0);  oled.print("STATUS DO SISTEMA");
-  oled.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-  oled.setCursor(0, 14);
-  oled.print("Wi-Fi: ");
-  oled.print(WiFi.status() == WL_CONNECTED ? WiFi.SSID().substring(0,14) : "offline");
-
-  oled.setCursor(0, 24);
-  oled.print("MQTT:  ");
-  oled.print(mqttConectado ? "conectado" : "desconectado");
-
-  oled.setCursor(0, 34);
-  oled.print("Sensor:");
-  oled.print(sensorOk ? " OK" : " FALHA");
-
-  oled.setCursor(0, 44);
-  oled.print("Erros: ");
-  oled.print(errosConsecutivos);
-
-  oled.setCursor(0, 54);
-  char ipBuf[20];
-  WiFi.localIP().toString().toCharArray(ipBuf, sizeof(ipBuf));
-  oled.print(ipBuf);
-
-  oledAtualizar();
-}
-
-void telaPortal(String ssidPortal) {
-  oledLimpar();
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-
-  oled.setCursor(0, 0);   oled.print("CONFIGURACAO");
-  oled.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-  oled.setCursor(0, 14);  oled.print("Wi-Fi:");
-  oled.setCursor(0, 24);  oled.print(ssidPortal);
-  oled.setCursor(0, 36);  oled.print("Acesse:");
-  oled.setCursor(0, 46);  oled.print("192.168.4.1");
-
-  oledAtualizar();
-}
-
-void telaConectando() {
-  oledLimpar();
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-  oled.setCursor(28, 20);
-  oled.print("Conectando...");
-  oled.setCursor(0, 36);
-  oled.print(cfg.wifiSSID);
-  oledAtualizar();
-}
-
-void telaErro(const char* msg) {
-  oledLimpar();
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-  oled.setCursor(0, 0);   oled.print("! ERRO !");
-  oled.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-  oled.setCursor(0, 16);  oled.print(msg);
-  oledAtualizar();
-}
-
-void telaProvisionando() {
-  oledLimpar();
-  oled.setTextSize(1);
-  oled.setTextColor(SSD1306_WHITE);
-  oled.setCursor(0, 0);   oled.print("PROVISIONANDO");
-  oled.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-  oled.setCursor(0, 18);  oled.print("Buscando config");
-  oled.setCursor(0, 28);  oled.print("no servidor...");
-  oledAtualizar();
+  LittleFS.remove("/config.json");
+  Serial.println("[FS] Config apagada — resetando...");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -329,7 +205,7 @@ input[name=codigo]{font-size:22px;font-weight:800;letter-spacing:6px;text-align:
     <button class="btn" type="submit">Conectar</button>
   </form>
   <div class="ok" id="ok">✓ Conectando e buscando configuração...</div>
-  <p class="note">Rizom Temp v2.0 · ESP32-C3<br>Segure BOOT 5s para redefinir</p>
+  <p class="note">Rizom Temp v2.0 · Wemos D1 Mini<br>Segure D3 (FLASH) 5s para redefinir</p>
 </div>
 <script>
 document.getElementById('f').addEventListener('submit',async(e)=>{
@@ -341,6 +217,20 @@ document.getElementById('f').addEventListener('submit',async(e)=>{
 </script>
 </body></html>
 )rawliteral";
+
+// ═══════════════════════════════════════════════════════════════
+//  LED STATUS
+// ═══════════════════════════════════════════════════════════════
+void ledOn()  { digitalWrite(PIN_LED, LOW); }
+void ledOff() { digitalWrite(PIN_LED, HIGH); }
+
+void ledBlink(int intervaloMs = 200) {
+  if (millis() - tsLed >= (unsigned long)intervaloMs) {
+    ledState = !ledState;
+    digitalWrite(PIN_LED, ledState ? LOW : HIGH);
+    tsLed = millis();
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  CAPTIVE PORTAL — SERVIDOR
@@ -357,18 +247,16 @@ void iniciarPortal() {
     WiFi.softAPIP().toString().c_str()
   );
 
-  // Rota principal
   portalServer.on("/", HTTP_GET, []() {
     portalServer.send_P(200, "text/html", PORTAL_HTML);
   });
 
-  // Captura qualquer URL para redirecionar ao portal (captive)
+  // Redireciona qualquer URL para o portal (captive portal)
   portalServer.onNotFound([]() {
     portalServer.sendHeader("Location", "http://192.168.4.1/", true);
     portalServer.send(302, "text/plain", "");
   });
 
-  // Salvar configurações
   portalServer.on("/save", HTTP_POST, []() {
     if (!portalServer.hasArg("plain")) {
       portalServer.send(400, "application/json", "{\"erro\":\"sem dados\"}");
@@ -382,11 +270,9 @@ void iniciarPortal() {
       return;
     }
 
-    // Preenche config
-    strlcpy(cfg.wifiSSID,  doc["ssid"]    | "", sizeof(cfg.wifiSSID));
-    strlcpy(cfg.wifiSenha, doc["pass"]    | "", sizeof(cfg.wifiSenha));
-    strlcpy(cfg.codigo,    doc["codigo"]  | "", sizeof(cfg.codigo));
-    // Limpa campos que serão preenchidos pelo provisionamento
+    strlcpy(cfg.wifiSSID,  doc["ssid"]   | "", sizeof(cfg.wifiSSID));
+    strlcpy(cfg.wifiSenha, doc["pass"]   | "", sizeof(cfg.wifiSenha));
+    strlcpy(cfg.codigo,    doc["codigo"] | "", sizeof(cfg.codigo));
     cfg.mqttHost[0]  = '\0';
     cfg.deviceId[0]  = '\0';
     cfg.mqttPort     = 1883;
@@ -395,7 +281,7 @@ void iniciarPortal() {
     salvarConfig();
     portalServer.send(200, "application/json", "{\"ok\":true}");
 
-    Serial.println("[Portal] Config salva via portal. Reiniciando...");
+    Serial.println("[Portal] Config salva. Reiniciando...");
     delay(1500);
     ESP.restart();
   });
@@ -403,7 +289,6 @@ void iniciarPortal() {
   portalServer.begin();
   estado = PORTAL;
   tsInicioPortal = millis();
-  telaPortal(ssidPortal);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -411,13 +296,13 @@ void iniciarPortal() {
 // ═══════════════════════════════════════════════════════════════
 bool conectarWifi() {
   Serial.printf("[WiFi] Conectando em '%s'...\n", cfg.wifiSSID);
-  telaConectando();
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(cfg.wifiSSID, cfg.wifiSenha);
 
   int tentativas = 0;
   while (WiFi.status() != WL_CONNECTED && tentativas < 40) {
+    ledBlink(300);
     delay(500);
     tentativas++;
     Serial.print(".");
@@ -447,7 +332,7 @@ bool conectarMQTT() {
   mqtt.setKeepAlive(60);
   mqtt.setSocketTimeout(10);
 
-  String clientId = "rizomtemp_c3_" + deviceMac;
+  String clientId = "rizomtemp_d1_" + deviceMac;
 
   Serial.printf("[MQTT] Conectando em %s:%d...\n", cfg.mqttHost, cfg.mqttPort);
 
@@ -466,7 +351,6 @@ bool conectarMQTT() {
 }
 
 void publicarTemperatura(float temp) {
-  // Payload compacto: {"t":-17.2,"v":"2.0","rssi":-65}
   char payload[80];
   snprintf(payload, sizeof(payload),
     "{\"t\":%.2f,\"v\":\"2.0\",\"rssi\":%d}",
@@ -484,7 +368,7 @@ void publicarTemperatura(float temp) {
 void publicarHeartbeat() {
   char payload[64];
   snprintf(payload, sizeof(payload),
-    "{\"v\":\"2.0\",\"rssi\":%d,\"hw\":\"esp32c3\"}",
+    "{\"v\":\"2.0\",\"rssi\":%d,\"hw\":\"esp8266\"}",
     WiFi.RSSI()
   );
   mqtt.publish(topicoHeartbeat().c_str(), payload);
@@ -498,7 +382,6 @@ float lerTemperatura() {
   sensors.requestTemperatures();
   float t = sensors.getTempCByIndex(0);
 
-  // Valores inválidos do DS18B20
   if (t == DEVICE_DISCONNECTED_C || t == 85.0f || t < -55.0f || t > 125.0f) {
     sensorOk = false;
     errosConsecutivos++;
@@ -512,24 +395,7 @@ float lerTemperatura() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  LED STATUS (built-in, ativo em LOW no C3 Super Mini)
-// ═══════════════════════════════════════════════════════════════
-void ledOn()  { digitalWrite(PIN_LED, LOW); }
-void ledOff() { digitalWrite(PIN_LED, HIGH); }
-
-unsigned long tsLed = 0;
-bool ledState = false;
-
-void ledBlink(int intervaloMs = 200) {
-  if (millis() - tsLed >= (unsigned long)intervaloMs) {
-    ledState = !ledState;
-    digitalWrite(PIN_LED, ledState ? LOW : HIGH);
-    tsLed = millis();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  BOTÃO BOOT — RESET LONGO
+//  BOTÃO D3 — RESET LONGO
 // ═══════════════════════════════════════════════════════════════
 void verificarBotaoReset() {
   bool pressionado = (digitalRead(PIN_BOOT) == LOW);
@@ -542,67 +408,10 @@ void verificarBotaoReset() {
   }
 
   if (bootPressionado && (millis() - tsBootPressionado >= HOLD_RESET_MS)) {
-    telaErro("Resetando config...");
-    delay(1000);
+    Serial.println("[Reset] Apagando config e reiniciando...");
     apagarConfig();
     delay(500);
     ESP.restart();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  SETUP
-// ═══════════════════════════════════════════════════════════════
-void setup() {
-  Serial.begin(115200);
-  delay(500);
-  Serial.println("\n\n=== Rizom Temp v2.0 | ESP32-C3 Super Mini ===");
-
-  // Pinos
-  pinMode(PIN_LED,  OUTPUT);
-  pinMode(PIN_BOOT, INPUT_PULLUP);
-  ledOff();
-
-  // MAC para ID único — usando API Arduino (compatível com todos os cores ESP32)
-  uint8_t mac[6];
-  WiFi.macAddress(mac);  // preenche mac[0..5] com o MAC da STA
-  char macStr[7];
-  snprintf(macStr, sizeof(macStr), "%02X%02X%02X", mac[3], mac[4], mac[5]);
-  deviceMac = String(macStr);
-  Serial.printf("[Info] MAC suffix: %s\n", macStr);
-
-  // I2C e OLED
-  Wire.begin(PIN_SDA, PIN_SCL);
-  if (!oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-    Serial.println("[OLED] Falha ao inicializar — verifique os pinos I2C.");
-    // Continua sem OLED
-  } else {
-    oled.clearDisplay();
-    oled.setTextColor(SSD1306_WHITE);
-    oled.setTextSize(1);
-    oled.setCursor(24, 20); oled.print("Rizom Temp v2");
-    oled.setCursor(28, 36); oled.print("Iniciando...");
-    oled.display();
-    Serial.println("[OLED] OK.");
-  }
-  delay(1200);
-
-  // Sensor DS18B20
-  sensors.begin();
-  int numSensores = sensors.getDeviceCount();
-  Serial.printf("[DS18B20] %d sensor(es) encontrado(s).\n", numSensores);
-  if (numSensores == 0) {
-    Serial.println("[DS18B20] AVISO: Nenhum sensor detectado. Verifique a fiação e o pull-up de 4.7kΩ.");
-  }
-
-  // Carrega config salva
-  if (carregarConfig()) {
-    Serial.printf("[NVS] Config carregada: SSID='%s' | MQTT='%s:%d' | ID='%s'\n",
-      cfg.wifiSSID, cfg.mqttHost, cfg.mqttPort, cfg.deviceId);
-    estado = CONECTANDO;
-  } else {
-    Serial.println("[NVS] Sem config salva. Iniciando portal...");
-    iniciarPortal();
   }
 }
 
@@ -615,23 +424,25 @@ bool buscarConfigRemota() {
     return false;
   }
 
-  telaProvisionando();
+  Serial.println("[Prov] Buscando configuração no servidor...");
 
-  WiFiClientSecure secureClient;
+  BearSSL::WiFiClientSecure secureClient;
   secureClient.setInsecure();
   HTTPClient http;
 
   String url = String(PROVISIONING_URL) + String(cfg.codigo);
   Serial.printf("[Prov] GET %s\n", url.c_str());
 
-  http.begin(secureClient, url);
+  if (!http.begin(secureClient, url)) {
+    Serial.println("[Prov] Falha ao iniciar HTTP.");
+    return false;
+  }
+
   http.setTimeout(10000);
   int httpCode = http.GET();
-
   Serial.printf("[Prov] HTTP %d\n", httpCode);
 
   if (httpCode != 200) {
-    Serial.printf("[Prov] Falha: HTTP %d\n", httpCode);
     http.end();
     return false;
   }
@@ -658,9 +469,56 @@ bool buscarConfigRemota() {
   }
 
   salvarConfig();
-  Serial.printf("[Prov] OK — device_id: %s | mqtt: %s:%d\n",
-    cfg.deviceId, cfg.mqttHost, cfg.mqttPort);
+  Serial.printf("[Prov] OK — device_id: %s | mqtt: %s:%d | intervalo: %ds\n",
+    cfg.deviceId, cfg.mqttHost, cfg.mqttPort, cfg.intervaloSeg);
   return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════════════════════════════
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n\n=== Rizom Temp v2.0 | Wemos D1 Mini ===");
+
+  pinMode(PIN_LED,  OUTPUT);
+  pinMode(PIN_BOOT, INPUT_PULLUP);
+  ledOff();
+
+  // MAC — últimos 6 chars para ID único do AP
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char macStr[7];
+  snprintf(macStr, sizeof(macStr), "%02X%02X%02X", mac[3], mac[4], mac[5]);
+  deviceMac = String(macStr);
+  Serial.printf("[Info] MAC suffix: %s\n", macStr);
+
+  // LittleFS
+  if (!LittleFS.begin()) {
+    Serial.println("[FS] Falha ao montar LittleFS. Formatando...");
+    LittleFS.format();
+    LittleFS.begin();
+  }
+  Serial.println("[FS] OK.");
+
+  // DS18B20
+  sensors.begin();
+  int numSensores = sensors.getDeviceCount();
+  Serial.printf("[DS18B20] %d sensor(es) encontrado(s).\n", numSensores);
+  if (numSensores == 0) {
+    Serial.println("[DS18B20] AVISO: Nenhum sensor. Verifique fiação e pull-up 4.7kΩ em D5.");
+  }
+
+  // Carrega config
+  if (carregarConfig() && strlen(cfg.wifiSSID) > 0) {
+    Serial.printf("[FS] Config: SSID='%s' | MQTT='%s:%d' | ID='%s'\n",
+      cfg.wifiSSID, cfg.mqttHost, cfg.mqttPort, cfg.deviceId);
+    estado = CONECTANDO;
+  } else {
+    Serial.println("[FS] Sem config. Iniciando portal...");
+    iniciarPortal();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -672,10 +530,9 @@ void loop() {
 
   // ── MODO PORTAL ─────────────────────────────────────────────
   if (estado == PORTAL) {
-    ledBlink(150);          // pisca rápido no portal
+    ledBlink(150);
     portalServer.handleClient();
 
-    // Timeout do portal
     if (agora - tsInicioPortal > TIMEOUT_PORTAL_MS) {
       Serial.println("[Portal] Timeout. Reiniciando...");
       ESP.restart();
@@ -685,16 +542,11 @@ void loop() {
 
   // ── MODO CONECTANDO ─────────────────────────────────────────
   if (estado == CONECTANDO) {
-    ledBlink(500);
     if (conectarWifi()) {
-      delay(1500); // aguarda TCP stack estabilizar
-      if (strlen(cfg.codigo) == 6) {
-        estado = PROVISIONANDO;
-      } else {
-        estado = OPERANDO;
-      }
+      delay(1000);
+      estado = (strlen(cfg.codigo) == 6) ? PROVISIONANDO : OPERANDO;
     } else {
-      Serial.println("[WiFi] Não conseguiu conectar. Abrindo portal...");
+      Serial.println("[WiFi] Não conectou. Abrindo portal...");
       iniciarPortal();
     }
     return;
@@ -704,16 +556,11 @@ void loop() {
   if (estado == PROVISIONANDO) {
     ledBlink(300);
     if (buscarConfigRemota()) {
-      oledLimpar();
-      oled.setTextSize(1);
-      oled.setTextColor(SSD1306_WHITE);
-      oled.setCursor(16, 20); oled.print("Config recebida!");
-      oled.setCursor(28, 36); oled.print("Reiniciando...");
-      oledAtualizar();
+      Serial.println("[Prov] Sucesso. Reiniciando...");
       delay(2000);
       ESP.restart();
     } else {
-      telaErro("Codigo invalido\nou expirado.\nAbrindo portal...");
+      Serial.println("[Prov] Falha. Abrindo portal...");
       delay(3000);
       iniciarPortal();
     }
@@ -723,7 +570,7 @@ void loop() {
   // ── MODO OPERANDO ────────────────────────────────────────────
   if (estado == OPERANDO) {
 
-    // Verifica Wi-Fi
+    // Reconecta Wi-Fi se necessário
     if (WiFi.status() != WL_CONNECTED) {
       Serial.println("[WiFi] Desconectado. Reconectando...");
       mqttConectado = false;
@@ -732,14 +579,14 @@ void loop() {
       return;
     }
 
-    // Tenta conectar/manter MQTT
+    // Mantém conexão MQTT
     if (!mqtt.connected()) {
       mqttConectado = false;
       conectarMQTT();
     }
     mqtt.loop();
 
-    ledOn(); // LED fixo quando operando normalmente
+    ledOn();
 
     // ── Leitura de temperatura ──────────────────────────────
     unsigned long intervaloMs = (unsigned long)cfg.intervaloSeg * 1000UL;
@@ -755,9 +602,6 @@ void loop() {
         }
       } else {
         Serial.println("[Temp] Leitura inválida — não publicado.");
-        if (errosConsecutivos >= 5) {
-          telaErro("Sensor desconectado!");
-        }
       }
     }
 
@@ -767,18 +611,6 @@ void loop() {
         publicarHeartbeat();
       }
       tsUltimoHeartbeat = agora;
-    }
-
-    // ── Ciclo de display ──────────────────────────────────────
-    if (agora - tsUltimoDisplay >= INTERVALO_DISPLAY_MS) {
-      displayTela = (displayTela + 1) % 2;
-      tsUltimoDisplay = agora;
-    }
-
-    if (displayTela == 0) {
-      telaTemperatura();
-    } else {
-      telaStatus();
     }
   }
 }
