@@ -22,6 +22,7 @@
  *   - OneWire                (Paul Stoffregen)     v2.3+
  *   - DallasTemperature      (Miles Burton)        v3.9+
  *   - ArduinoJson            (Benoit Blanchon)     v7+
+ *   (EEPROM é built-in no core ESP8266 — não precisa instalar)
  *
  * PLACA: "LOLIN(WEMOS) D1 R2 & mini" — em Arduino IDE
  * ou "d1_mini" — em PlatformIO (platform = espressif8266)
@@ -43,7 +44,7 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClientSecure.h>
-#include <LittleFS.h>
+#include <EEPROM.h>
 #include <PubSubClient.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -69,8 +70,12 @@ ESP8266WebServer  portalServer(80);
 WiFiClient        wifiClient;
 PubSubClient      mqtt(wifiClient);
 
-// ─── Configurações (salvas em LittleFS) ──────────────────────
+// ─── Configurações (salvas em EEPROM) ────────────────────────
+#define EEPROM_MAGIC   0xAB
+#define EEPROM_SIZE    512
+
 struct Config {
+  uint8_t magic      = 0;
   char wifiSSID[64]  = "";
   char wifiSenha[64] = "";
   char mqttHost[128] = "";
@@ -103,63 +108,36 @@ bool          ledState = false;
 String deviceMac;
 
 // ═══════════════════════════════════════════════════════════════
-//  PERSISTÊNCIA — LittleFS
+//  PERSISTÊNCIA — EEPROM
 // ═══════════════════════════════════════════════════════════════
 void salvarConfig() {
-  File f = LittleFS.open("/config.json", "w");
-  if (!f) {
-    Serial.println("[FS] Erro ao abrir config.json para escrita.");
-    return;
-  }
-
-  JsonDocument doc;
-  doc["ssid"]        = cfg.wifiSSID;
-  doc["pass"]        = cfg.wifiSenha;
-  doc["mqttHost"]    = cfg.mqttHost;
-  doc["mqttPort"]    = cfg.mqttPort;
-  doc["mqttUser"]    = cfg.mqttUser;
-  doc["mqttPass"]    = cfg.mqttSenha;
-  doc["deviceId"]    = cfg.deviceId;
-  doc["intervalo"]   = cfg.intervaloSeg;
-  doc["codigo"]      = cfg.codigo;
-
-  serializeJson(doc, f);
-  f.close();
-  Serial.println("[FS] Config salva.");
+  cfg.magic = EEPROM_MAGIC;
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.put(0, cfg);
+  EEPROM.commit();
+  EEPROM.end();
+  Serial.println("[EEPROM] Config salva.");
 }
 
 bool carregarConfig() {
-  File f = LittleFS.open("/config.json", "r");
-  if (!f) return false;
+  EEPROM.begin(EEPROM_SIZE);
+  Config loaded;
+  EEPROM.get(0, loaded);
+  EEPROM.end();
 
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, f);
-  f.close();
+  if (loaded.magic != EEPROM_MAGIC || strlen(loaded.wifiSSID) == 0) return false;
 
-  if (err) {
-    Serial.printf("[FS] JSON inválido: %s\n", err.c_str());
-    return false;
-  }
-
-  const char* ssid = doc["ssid"] | "";
-  if (strlen(ssid) == 0) return false;
-
-  strlcpy(cfg.wifiSSID,  doc["ssid"]      | "", sizeof(cfg.wifiSSID));
-  strlcpy(cfg.wifiSenha, doc["pass"]      | "", sizeof(cfg.wifiSenha));
-  strlcpy(cfg.mqttHost,  doc["mqttHost"]  | "", sizeof(cfg.mqttHost));
-  cfg.mqttPort     = doc["mqttPort"]  | 1883;
-  strlcpy(cfg.mqttUser,  doc["mqttUser"]  | "", sizeof(cfg.mqttUser));
-  strlcpy(cfg.mqttSenha, doc["mqttPass"]  | "", sizeof(cfg.mqttSenha));
-  strlcpy(cfg.deviceId,  doc["deviceId"]  | "", sizeof(cfg.deviceId));
-  cfg.intervaloSeg = doc["intervalo"]  | 60;
-  strlcpy(cfg.codigo,    doc["codigo"]    | "", sizeof(cfg.codigo));
-
+  cfg = loaded;
   return true;
 }
 
 void apagarConfig() {
-  LittleFS.remove("/config.json");
-  Serial.println("[FS] Config apagada — resetando...");
+  EEPROM.begin(EEPROM_SIZE);
+  Config blank;
+  EEPROM.put(0, blank);
+  EEPROM.commit();
+  EEPROM.end();
+  Serial.println("[EEPROM] Config apagada.");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -493,14 +471,6 @@ void setup() {
   snprintf(macStr, sizeof(macStr), "%02X%02X%02X", mac[3], mac[4], mac[5]);
   deviceMac = String(macStr);
   Serial.printf("[Info] MAC suffix: %s\n", macStr);
-
-  // LittleFS
-  if (!LittleFS.begin()) {
-    Serial.println("[FS] Falha ao montar LittleFS. Formatando...");
-    LittleFS.format();
-    LittleFS.begin();
-  }
-  Serial.println("[FS] OK.");
 
   // DS18B20
   sensors.begin();
