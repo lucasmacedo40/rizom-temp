@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RizomTemp — Rede</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div class="topbar"><div class="logo">Rizom<span>Temp</span></div><a class="logout" href="/logout">sair</a></div>
+<nav class="nav">
+  <a href="/status">Status</a>
+  <a href="/rede" class="active">Rede</a>
+  <a href="/temperatura">Temp</a>
+  <a href="/config">Config</a>
+</nav>
+<div class="page">
+  <form id="f">
+    <div class="field"><label>Rede Wi-Fi (SSID)</label><input name="ssid" id="ssid" required></div>
+    <div class="field"><label>Senha</label><input name="pass" type="password" id="pass"></div>
+    <button type="submit" class="btn btn-primary">SALVAR E RECONECTAR</button>
+  </form>
+  <div class="msg-ok" id="msg">Salvo! Reconectando em instantes...</div>
+  <div class="section-title">Redes disponíveis</div>
+  <div class="wifi-list" id="lista"><div style="padding:12px;text-align:center;font-size:13px;color:#94A3B8">Buscando...</div></div>
+  <button class="btn btn-secondary" onclick="scan()" style="margin-top:8px">ATUALIZAR LISTA</button>
+</div>
+<script>
+async function scan() {
+  document.getElementById('lista').innerHTML = '<div style="padding:12px;text-align:center;font-size:13px;color:#94A3B8">Buscando...</div>';
+  const redes = await fetch('/api/scan').then(r => r.json()).catch(() => []);
+  const lista = document.getElementById('lista');
+  if (!redes.length) { lista.innerHTML = '<div style="padding:12px;text-align:center;font-size:13px;color:#94A3B8">Nenhuma rede encontrada</div>'; return; }
+  lista.innerHTML = redes.map(r =>
+    `<div class="wifi-item" onclick="document.getElementById('ssid').value='${r.ssid.replace(/'/g,"\\'")}'">` +
+    `<span class="ssid">${r.ssid}</span><span class="rssi">${r.rssi} dBm</span></div>`
+  ).join('');
+}
+fetch('/api/config').then(r => r.json()).then(d => { document.getElementById('ssid').value = d.ssid || ''; });
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  await fetch('/rede/salvar', {method:'POST', body: new URLSearchParams(new FormData(e.target))});
+  document.getElementById('msg').style.display = 'block';
+});
+scan();
+</script>
+</body></html>

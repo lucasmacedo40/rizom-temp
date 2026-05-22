@@ -360,6 +360,39 @@ void iniciarPortalSTA() {
     portal.send(200, "application/json", buf);
   });
 
+  portal.on("/rede", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    servirArquivo("/rede.html", "text/html");
+  });
+
+  portal.on("/api/scan", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    int n = WiFi.scanNetworks();
+    String j = "[";
+    for (int i = 0; i < n; i++) {
+      if (i > 0) j += ",";
+      String ssid = WiFi.SSID(i);
+      ssid.replace("\"", "\\\"");
+      j += "{\"ssid\":\"" + ssid + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+    }
+    j += "]";
+    WiFi.scanDelete();
+    portal.send(200, "application/json", j);
+  });
+
+  portal.on("/rede/salvar", HTTP_POST, [] {
+    if (!verificarSessao()) return;
+    String ssid = portal.arg("ssid");
+    String pass = portal.arg("pass");
+    if (ssid.isEmpty()) { portal.send(400, "text/plain", "SSID obrigatorio"); return; }
+    ssid.toCharArray(cfg.ssid, sizeof(cfg.ssid));
+    pass.toCharArray(cfg.pass, sizeof(cfg.pass));
+    salvarConfig();
+    portal.send(200, "text/plain", "ok");
+    delay(1000);
+    ESP.restart();
+  });
+
 
   portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
 
