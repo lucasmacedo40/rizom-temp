@@ -247,7 +247,7 @@ document.getElementById('f').addEventListener('submit', async e => {
 </body></html>
 )html";
 
-void iniciarPortal() {
+void iniciarPortalAP() {
   String ap = "RizomTemp-" + deviceMac;
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ap.c_str());
@@ -288,6 +288,26 @@ void iniciarPortal() {
   });
 
   portal.begin();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PORTAL STA — Portal completo (modo conectado)
+// ═══════════════════════════════════════════════════════════════
+void iniciarPortalSTA() {
+  const char* hdrs[] = {"Cookie"};
+  portal.collectHeaders(hdrs, 1);
+
+  portal.serveStatic("/style.css", LittleFS, "/style.css");
+
+  portal.on("/", HTTP_GET, [] {
+    portal.sendHeader("Location", sessionToken.length() ? "/status" : "/login");
+    portal.send(302, "text/plain", "");
+  });
+
+  portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
+
+  portal.begin();
+  Serial.println("[Portal] Portal STA iniciado na porta 80");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -442,7 +462,7 @@ void setup() {
 
   if (!carregarConfig()) {
     Serial.println("[Config] Sem config — abrindo portal");
-    iniciarPortal();
+    iniciarPortalAP();
     estado = PORTAL_MODE;
     tsPortal = millis();
     return;
@@ -451,7 +471,7 @@ void setup() {
   Serial.printf("[Config] SSID=%s  MQTT=%s:%d  ID=%s\n",
     cfg.ssid, cfg.mqttHost, cfg.mqttPort, cfg.deviceId);
 
-  if (!conectarWifi()) { iniciarPortal(); estado = PORTAL_MODE; tsPortal = millis(); return; }
+  if (!conectarWifi()) { iniciarPortalAP(); estado = PORTAL_MODE; tsPortal = millis(); return; }
 
   if (cfg.codigo[0] != '\0') {
     estado = PROVISIONANDO;
@@ -488,7 +508,7 @@ void loop() {
   if (estado == PROVISIONANDO) {
     ledBlink(300);
     if (provisionar()) { delay(1500); ESP.restart(); }
-    else { Serial.println("[Prov] Falha — abrindo portal."); delay(2000); iniciarPortal(); estado = PORTAL_MODE; tsPortal = agora; }
+    else { Serial.println("[Prov] Falha — abrindo portal."); delay(2000); iniciarPortalAP(); estado = PORTAL_MODE; tsPortal = agora; }
     return;
   }
 
