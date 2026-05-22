@@ -32,8 +32,8 @@
 
 // ─── Constantes ───────────────────────────────────────────────
 #define PROVISIONING_URL  "https://temp.rizom.com.br/provisioning/"
-#define EEPROM_MAGIC      0xAB
-#define EEPROM_SIZE       512
+#define EEPROM_MAGIC      0xAC
+#define EEPROM_SIZE       640
 #define PORTAL_TIMEOUT_MS 300000UL
 #define RESET_HOLD_MS     5000UL
 
@@ -47,6 +47,9 @@ struct Config {
   char deviceId[32]  = "";
   int  intervalo     = 60;
   char codigo[7]     = "";
+  char portalUser[32] = "admin";
+  char portalPass[32] = "rizom";
+  char deviceName[32] = "RizomTemp";
 } cfg;
 
 void salvarConfig() {
