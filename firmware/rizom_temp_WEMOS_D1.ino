@@ -24,6 +24,7 @@
 #include <PubSubClient.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <LittleFS.h>
 
 // ─── Pinos ────────────────────────────────────────────────────
 #define PIN_SENSOR  14   // D5
@@ -86,6 +87,7 @@ WiFiClient        net;
 PubSubClient      mqtt(net);
 
 String deviceMac;
+String sessionToken = "";
 
 
 // ─── Histórico de temperatura em RAM ──────────────────────────
@@ -111,6 +113,33 @@ String histJson() {
     j += "{"age":" + String(age) + ","t":" + String(historico[idx].t, 2) + "}";
   }
   return j + "]";
+}
+
+// ─── Sessão e helpers do portal ───────────────────────────────
+String gerarToken() {
+  String t = "";
+  for (int i = 0; i < 32; i++) t += String(random(16), HEX);
+  return t;
+}
+
+void servirArquivo(const String& path, const String& ct) {
+  if (!LittleFS.exists(path)) { portal.send(404, "text/plain", "Not found"); return; }
+  File f = LittleFS.open(path, "r");
+  portal.streamFile(f, ct);
+  f.close();
+}
+
+bool verificarSessao() {
+  if (sessionToken.length() == 0) {
+    portal.sendHeader("Location", "/login");
+    portal.send(302, "text/plain", "");
+    return false;
+  }
+  String cookie = portal.header("Cookie");
+  if (cookie.indexOf("sid=" + sessionToken) >= 0) return true;
+  portal.sendHeader("Location", "/login");
+  portal.send(302, "text/plain", "");
+  return false;
 }
 
 // ═══════════════════════════════════════════════════════════════
