@@ -43,3 +43,73 @@ code,pre     { font-family: var(--font-mono); }
 button { cursor: pointer; border: none; outline: none; font-family: inherit; }
 input,select,textarea { font-family: inherit; outline: none; }
 a { text-decoration: none; color: inherit; }
+
+/* ── Layout responsivo ─────────────────────────────────────── */
+.sidebar {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 100;
+  width: 220px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 0;
+}
+
+.main-content {
+  margin-left: 220px;
+  flex: 1;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.mobile-header { display: none; }
+.bottom-nav    { display: none; }
+
+@media (max-width: 767px) {
+  .sidebar { display: none; }
+
+  .mobile-header {
+    display: flex;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    align-items: stretch;
+  }
+
+  .bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color .15s;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-nav a.active {
+    color: var(--rizom-blue);
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: calc(56px + 16px);
+    padding-bottom: calc(60px + 16px);
+  }
+}
