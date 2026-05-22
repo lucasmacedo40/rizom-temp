@@ -429,6 +429,14 @@ void setup() {
   snprintf(buf, sizeof(buf), "%02X%02X%02X", mac[3], mac[4], mac[5]);
   deviceMac = buf;
 
+  randomSeed(mac[3] * 65536UL + mac[4] * 256 + mac[5] + micros());
+
+  if (!LittleFS.begin()) {
+    Serial.println("[LittleFS] Falha — execute 'Upload Filesystem Image' antes do firmware.");
+  } else {
+    Serial.println("[LittleFS] OK");
+  }
+
   ds.begin();
   Serial.printf("[DS18B20] %d sensor(es)\n", ds.getDeviceCount());
 
