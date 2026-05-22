@@ -304,6 +304,29 @@ void iniciarPortalSTA() {
     portal.send(302, "text/plain", "");
   });
 
+  portal.on("/login", HTTP_GET, [] {
+    servirArquivo("/login.html", "text/html");
+  });
+
+  portal.on("/login", HTTP_POST, [] {
+    String user = portal.arg("user");
+    String pass = portal.arg("pass");
+    if (user == String(cfg.portalUser) && pass == String(cfg.portalPass)) {
+      sessionToken = gerarToken();
+      portal.sendHeader("Set-Cookie", "sid=" + sessionToken + "; HttpOnly; Path=/");
+      portal.sendHeader("Location", "/status");
+      portal.send(302, "text/plain", "");
+    } else {
+      portal.send(401, "text/plain", "Credenciais invalidas");
+    }
+  });
+
+  portal.on("/logout", HTTP_GET, [] {
+    sessionToken = "";
+    portal.sendHeader("Location", "/login");
+    portal.send(302, "text/plain", "");
+  });
+
   portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
 
   portal.begin();

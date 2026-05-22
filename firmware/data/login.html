@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RizomTemp — Login</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">Rizom<span>Temp</span></div>
+    <div class="login-sub">Painel de configuração do dispositivo</div>
+    <div class="error" id="err">Usuário ou senha incorretos</div>
+    <form id="f">
+      <div class="field"><label>Usuário</label><input name="user" autocomplete="username" required></div>
+      <div class="field"><label>Senha</label><input name="pass" type="password" autocomplete="current-password" required></div>
+      <button type="submit" class="btn btn-primary">ENTRAR</button>
+    </form>
+    <p class="note" style="margin-top:20px">Wemos D1 Mini · Firmware v2.0</p>
+  </div>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = await fetch('/login', {method:'POST', body: new URLSearchParams(new FormData(e.target))});
+  if (r.ok) { location.href = '/status'; }
+  else { document.getElementById('err').style.display = 'block'; }
+});
+</script>
+</body></html>
