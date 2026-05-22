@@ -403,6 +403,52 @@ void iniciarPortalSTA() {
     portal.send(200, "application/json", "{\"leituras\":" + histJson() + "}");
   });
 
+  portal.on("/config", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    servirArquivo("/config.html", "text/html");
+  });
+
+  portal.on("/api/config", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    char buf[256];
+    snprintf(buf, sizeof(buf),
+      "{\"deviceName\":\"%s\",\"intervalo\":%d,\"portalUser\":\"%s\","
+      "\"ssid\":\"%s\",\"deviceId\":\"%s\"}",
+      cfg.deviceName, cfg.intervalo, cfg.portalUser,
+      cfg.ssid, cfg.deviceId
+    );
+    portal.send(200, "application/json", buf);
+  });
+
+  portal.on("/config/salvar", HTTP_POST, [] {
+    if (!verificarSessao()) return;
+    String dn = portal.arg("deviceName");
+    String iv = portal.arg("intervalo");
+    String pu = portal.arg("portalUser");
+    String pp = portal.arg("portalPass");
+    if (dn.length() > 0) dn.toCharArray(cfg.deviceName, sizeof(cfg.deviceName));
+    if (iv.toInt() >= 10) cfg.intervalo = iv.toInt();
+    if (pu.length() > 0) pu.toCharArray(cfg.portalUser, sizeof(cfg.portalUser));
+    if (pp.length() > 0) pp.toCharArray(cfg.portalPass, sizeof(cfg.portalPass));
+    salvarConfig();
+    portal.send(200, "text/plain", "ok");
+  });
+
+  portal.on("/reboot", HTTP_POST, [] {
+    if (!verificarSessao()) return;
+    portal.send(200, "text/plain", "ok");
+    delay(500);
+    ESP.restart();
+  });
+
+  portal.on("/reset", HTTP_POST, [] {
+    if (!verificarSessao()) return;
+    portal.send(200, "text/plain", "ok");
+    apagarConfig();
+    delay(500);
+    ESP.restart();
+  });
+
 
   portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
 

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RizomTemp — Configurações</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div class="topbar"><div class="logo">Rizom<span>Temp</span></div><a class="logout" href="/logout">sair</a></div>
+<nav class="nav">
+  <a href="/status">Status</a>
+  <a href="/rede">Rede</a>
+  <a href="/temperatura">Temp</a>
+  <a href="/config" class="active">Config</a>
+</nav>
+<div class="page">
+  <form id="f">
+    <div class="card">
+      <h4>Dispositivo</h4>
+      <div class="field"><label>Nome</label><input name="deviceName" id="deviceName" required></div>
+      <div class="field"><label>Intervalo de leitura (segundos)</label><input name="intervalo" id="intervalo" type="number" min="10" max="3600" required></div>
+    </div>
+    <div class="card">
+      <h4>Acesso ao portal</h4>
+      <div class="field"><label>Usuário</label><input name="portalUser" id="portalUser" required></div>
+      <div class="field"><label>Nova senha (vazio = manter atual)</label><input name="portalPass" type="password" autocomplete="new-password"></div>
+    </div>
+    <div class="card">
+      <h4>Provisionamento</h4>
+      <div class="info-box" id="prov-info">Carregando...</div>
+    </div>
+    <button type="submit" class="btn btn-primary">SALVAR</button>
+  </form>
+  <div class="msg-ok" id="msg">Salvo com sucesso!</div>
+  <button class="btn btn-secondary" onclick="if(confirm('Reiniciar o dispositivo agora?')) fetch('/reboot',{method:'POST'})">REINICIAR DISPOSITIVO</button>
+  <button class="btn btn-danger" onclick="if(confirm('Apagar TUDO e voltar ao modo fábrica? Esta ação não pode ser desfeita.')) fetch('/reset',{method:'POST'})">RESET DE FÁBRICA</button>
+</div>
+<script>
+fetch('/api/config').then(r => r.json()).then(d => {
+  document.getElementById('deviceName').value = d.deviceName;
+  document.getElementById('intervalo').value = d.intervalo;
+  document.getElementById('portalUser').value = d.portalUser;
+  document.getElementById('prov-info').textContent = d.deviceId
+    ? `Provisionado · Device ID: ${d.deviceId}`
+    : 'Não provisionado · Segure D3 por 5s para abrir o app de setup';
+});
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = await fetch('/config/salvar', {method:'POST', body: new URLSearchParams(new FormData(e.target))});
+  if (r.ok) {
+    const msg = document.getElementById('msg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 3000);
+  }
+});
+</script>
+</body></html>
