@@ -393,6 +393,16 @@ void iniciarPortalSTA() {
     ESP.restart();
   });
 
+  portal.on("/temperatura", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    servirArquivo("/temperatura.html", "text/html");
+  });
+
+  portal.on("/api/temp", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    portal.send(200, "application/json", "{\"leituras\":" + histJson() + "}");
+  });
+
 
   portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
 

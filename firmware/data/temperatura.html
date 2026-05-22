@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RizomTemp — Temperatura</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div class="topbar"><div class="logo">Rizom<span>Temp</span></div><a class="logout" href="/logout">sair</a></div>
+<nav class="nav">
+  <a href="/status">Status</a>
+  <a href="/rede">Rede</a>
+  <a href="/temperatura" class="active">Temp</a>
+  <a href="/config">Config</a>
+</nav>
+<div class="page">
+  <div class="temp-big" id="temp">---</div>
+  <div class="temp-unit">Atualiza a cada 5s</div>
+  <div class="card">
+    <h4>Histórico recente (RAM)</h4>
+    <div id="historico"><div class="note">Sem leituras</div></div>
+  </div>
+  <p class="note">Últimas 20 leituras em memória · Perdidas no reboot<br>Histórico completo disponível no dashboard</p>
+</div>
+<script>
+async function atualizar() {
+  try {
+    const d = await fetch('/api/temp').then(r => r.json());
+    if (d.leituras && d.leituras.length > 0) {
+      const ultima = d.leituras[d.leituras.length - 1];
+      document.getElementById('temp').textContent = ultima.t.toFixed(1) + '°C';
+      document.getElementById('historico').innerHTML = [...d.leituras].reverse().map((l, i) => {
+        const label = l.age < 60 ? `há ${l.age}s` : `há ${Math.round(l.age/60)}min`;
+        return `<div class="stat-row"><span class="k">${label}</span><span class="v">${l.t.toFixed(2)}°C</span></div>`;
+      }).join('');
+    }
+  } catch(e) {}
+}
+atualizar();
+setInterval(atualizar, 5000);
+</script>
+</body></html>
