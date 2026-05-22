@@ -87,6 +87,32 @@ PubSubClient      mqtt(net);
 
 String deviceMac;
 
+
+// ─── Histórico de temperatura em RAM ──────────────────────────
+#define HIST_SIZE 20
+
+struct Leitura { unsigned long ts; float t; };
+Leitura historico[HIST_SIZE];
+int histCount = 0, histHead = 0;
+
+void pushLeitura(float temp) {
+  historico[histHead] = {millis(), temp};
+  histHead = (histHead + 1) % HIST_SIZE;
+  if (histCount < HIST_SIZE) histCount++;
+}
+
+String histJson() {
+  String j = "[";
+  int start = (histCount < HIST_SIZE) ? 0 : histHead;
+  for (int i = 0; i < histCount; i++) {
+    int idx = (start + i) % HIST_SIZE;
+    if (i > 0) j += ",";
+    unsigned long age = (millis() - historico[idx].ts) / 1000;
+    j += "{"age":" + String(age) + ","t":" + String(historico[idx].t, 2) + "}";
+  }
+  return j + "]";
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  HELPERS — parsing JSON simples (sem biblioteca externa)
 // ═══════════════════════════════════════════════════════════════
