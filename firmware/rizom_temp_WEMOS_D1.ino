@@ -327,6 +327,40 @@ void iniciarPortalSTA() {
     portal.send(302, "text/plain", "");
   });
 
+
+  portal.on("/status", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    servirArquivo("/status.html", "text/html");
+  });
+
+  portal.on("/api/status", HTTP_GET, [] {
+    if (!verificarSessao()) return;
+    bool wifiOk = (WiFi.status() == WL_CONNECTED);
+    float lastTemp = histCount > 0 ? historico[(histHead - 1 + HIST_SIZE) % HIST_SIZE].t : NAN;
+    unsigned long lastTs = histCount > 0 ? historico[(histHead - 1 + HIST_SIZE) % HIST_SIZE].ts : 0;
+    unsigned long upSec = millis() / 1000;
+    char buf[512];
+    snprintf(buf, sizeof(buf),
+      "{\"wifiOk\":%s,\"ssid\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"mac\":\"%s\","
+      "\"mqttOk\":%s,\"mqttHost\":\"%s\",\"deviceId\":\"%s\","
+      "\"temp\":%s,\"tempAge\":%lu,"
+      "\"uptime\":\"%luh %02lum\",\"intervalo\":%d,\"deviceName\":\"%s\"}",
+      wifiOk ? "true" : "false",
+      cfg.ssid,
+      wifiOk ? WiFi.localIP().toString().c_str() : "0.0.0.0",
+      wifiOk ? WiFi.RSSI() : 0,
+      deviceMac.c_str(),
+      mqtt.connected() ? "true" : "false",
+      cfg.mqttHost, cfg.deviceId,
+      isnan(lastTemp) ? "null" : String(lastTemp, 2).c_str(),
+      lastTs > 0 ? (millis() - lastTs) / 1000 : 0UL,
+      upSec / 3600, (upSec % 3600) / 60,
+      cfg.intervalo, cfg.deviceName
+    );
+    portal.send(200, "application/json", buf);
+  });
+
+
   portal.onNotFound([] { portal.send(404, "text/plain", "Not found"); });
 
   portal.begin();

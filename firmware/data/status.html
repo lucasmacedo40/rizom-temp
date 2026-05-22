@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RizomTemp — Status</title>
+<link rel="stylesheet" href="/style.css">
+</head><body>
+<div class="topbar"><div class="logo">Rizom<span>Temp</span></div><a class="logout" href="/logout">sair</a></div>
+<nav class="nav">
+  <a href="/status" class="active">Status</a>
+  <a href="/rede">Rede</a>
+  <a href="/temperatura">Temp</a>
+  <a href="/config">Config</a>
+</nav>
+<div class="page">
+  <div class="temp-big" id="temp">---</div>
+  <div class="temp-unit" id="temp-age">aguardando...</div>
+  <div class="card">
+    <h4>WiFi</h4>
+    <div class="stat-row"><span class="k">Status</span><span class="v" id="wifi-st">--</span></div>
+    <div class="stat-row"><span class="k">Rede</span><span class="v" id="wifi-ssid">--</span></div>
+    <div class="stat-row"><span class="k">IP</span><span class="v" id="wifi-ip">--</span></div>
+    <div class="stat-row"><span class="k">RSSI</span><span class="v" id="wifi-rssi">--</span></div>
+    <div class="stat-row"><span class="k">MAC</span><span class="v" id="wifi-mac">--</span></div>
+  </div>
+  <div class="card">
+    <h4>MQTT</h4>
+    <div class="stat-row"><span class="k">Status</span><span class="v" id="mqtt-st">--</span></div>
+    <div class="stat-row"><span class="k">Broker</span><span class="v" id="mqtt-host">--</span></div>
+    <div class="stat-row"><span class="k">Device ID</span><span class="v" id="device-id">--</span></div>
+  </div>
+  <div class="card">
+    <h4>Sistema</h4>
+    <div class="stat-row"><span class="k">Uptime</span><span class="v" id="uptime">--</span></div>
+    <div class="stat-row"><span class="k">Intervalo</span><span class="v" id="intervalo">--</span></div>
+    <div class="stat-row"><span class="k">Dispositivo</span><span class="v" id="device-name">--</span></div>
+  </div>
+</div>
+<script>
+async function atualizar() {
+  try {
+    const d = await fetch('/api/status').then(r => r.json());
+    const tempStr = d.temp !== null ? d.temp.toFixed(1) + '°C' : 'N/A';
+    document.getElementById('temp').textContent = tempStr;
+    const age = d.tempAge !== undefined ? d.tempAge : null;
+    document.getElementById('temp-age').textContent = age !== null ? `Última leitura há ${age}s` : 'Sem leitura';
+    document.getElementById('wifi-st').textContent = d.wifiOk ? 'Conectado' : 'Desconectado';
+    document.getElementById('wifi-st').className = 'v ' + (d.wifiOk ? 'ok' : 'err');
+    document.getElementById('wifi-ssid').textContent = d.ssid;
+    document.getElementById('wifi-ip').textContent = d.ip;
+    document.getElementById('wifi-rssi').textContent = d.rssi + ' dBm';
+    document.getElementById('wifi-mac').textContent = d.mac;
+    document.getElementById('mqtt-st').textContent = d.mqttOk ? 'Online' : 'Offline';
+    document.getElementById('mqtt-st').className = 'v ' + (d.mqttOk ? 'ok' : 'err');
+    document.getElementById('mqtt-host').textContent = d.mqttHost;
+    document.getElementById('device-id').textContent = d.deviceId;
+    document.getElementById('uptime').textContent = d.uptime;
+    document.getElementById('intervalo').textContent = d.intervalo + 's';
+    document.getElementById('device-name').textContent = d.deviceName;
+  } catch(e) {}
+}
+atualizar();
+setInterval(atualizar, 10000);
+</script>
+</body></html>
