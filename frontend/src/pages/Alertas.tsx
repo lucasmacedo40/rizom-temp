@@ -39,7 +39,7 @@ export default function Alertas() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Alertas</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
@@ -81,13 +81,13 @@ export default function Alertas() {
         }}>
           {alertas.map((a, i) => (
             <div key={a.id} style={{
-              display: 'flex', alignItems: 'center', gap: 16,
-              padding: '16px 20px',
+              display: 'flex', alignItems: 'flex-start', gap: 16,
+              padding: '16px 20px', flexWrap: 'wrap',
               borderBottom: i < alertas.length - 1 ? '1px solid var(--border)' : 'none',
               opacity: a.reconhecido ? 0.5 : 1,
             }}>
               <AlertTriangle size={18} color={a.reconhecido ? 'var(--text-muted)' : 'var(--alerta)'} />
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ fontSize: 14, fontWeight: 500 }}>{a.equipamento_nome}</span>
                   <span style={{

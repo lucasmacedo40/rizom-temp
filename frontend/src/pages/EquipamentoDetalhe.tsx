@@ -104,7 +104,7 @@ export default function EquipamentoDetalhe() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <button
           onClick={() => navigate(-1)}
           style={{
@@ -122,7 +122,7 @@ export default function EquipamentoDetalhe() {
             {equip.localizacao || 'Sem localização'} · {equip.device_id}
           </p>
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button
             onClick={() => setShowConfigurar(true)}
             style={{
@@ -158,7 +158,7 @@ export default function EquipamentoDetalhe() {
       </div>
 
       {/* Métricas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+      <div className="metrics-grid-4">
         <div style={{
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 8, padding: '20px 24px',
@@ -253,7 +253,7 @@ export default function EquipamentoDetalhe() {
         }} onClick={() => setShowManual(false)}>
           <div style={{
             background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: 28, width: 360,
+            borderRadius: 8, padding: 28, width: 360, maxWidth: 'calc(100vw - 32px)',
           }} onClick={e => e.stopPropagation()}>
             <h3 style={{ fontFamily: 'var(--font-sans)', marginBottom: 20 }}>Registro manual</h3>
             <div style={{ marginBottom: 14 }}>

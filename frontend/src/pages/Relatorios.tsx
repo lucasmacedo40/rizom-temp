@@ -60,7 +60,7 @@ export default function Relatorios() {
             onChange={e => setMes(e.target.value)}
             max={format(new Date(), 'yyyy-MM')}
             style={{
-              padding: '11px 14px', borderRadius: 8, fontSize: 14,
+              width: '100%', padding: '11px 14px', borderRadius: 8, fontSize: 14,
               background: 'var(--surface-2)', border: '1px solid var(--border)',
               color: 'var(--text-primary)',
             }}

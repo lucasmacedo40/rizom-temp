@@ -113,3 +113,25 @@ a { text-decoration: none; color: inherit; }
     padding-bottom: calc(60px + 16px);
   }
 }
+
+/* ── Responsive utilities ──────────────────────────────── */
+.modal-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px;
+  max-width: calc(100vw - 32px);
+}
+
+.metrics-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 767px) {
+  .metrics-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

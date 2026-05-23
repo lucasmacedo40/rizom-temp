@@ -63,7 +63,7 @@ export default function Equipamentos() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Equipamentos</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
@@ -97,10 +97,8 @@ export default function Equipamentos() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
         }} onClick={() => setShowModal(false)}>
           <div
-            style={{
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 8, padding: 28, width: 420,
-            }}
+            className="modal-inner"
+            style={{ width: 420 }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
