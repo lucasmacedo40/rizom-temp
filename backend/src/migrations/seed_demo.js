@@ -80,10 +80,12 @@ async function main() {
   const client = await pool.connect();
 
   try {
-    // 1. Busca o cliente existente
-    const { rows: clientes } = await client.query(
-      `SELECT id, nome FROM clientes ORDER BY criado_em LIMIT 1`
-    );
+    // 1. Busca o cliente existente (por email se SEED_CLIENT_EMAIL definido)
+    const clientEmail = process.env.SEED_CLIENT_EMAIL;
+    const { rows: clientes } = clientEmail
+      ? await client.query(`SELECT id, nome FROM clientes WHERE email = $1`, [clientEmail])
+      : await client.query(`SELECT id, nome FROM clientes ORDER BY criado_em LIMIT 1`);
+
     if (!clientes.length) {
       console.error('[Demo] Nenhum cliente encontrado. Execute seed.js primeiro.');
       process.exit(1);
