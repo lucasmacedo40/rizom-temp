@@ -1,0 +1,144 @@
+{
+  "name": "Rizom Temp — Alertas (WhatsApp + Email)",
+  "nodes": [
+    {
+      "id": "node-webhook",
+      "name": "Alerta Recebido",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "rizomtemp-alerta",
+      "parameters": {
+        "path": "rizomtemp-alerta",
+        "responseMode": "onReceived",
+        "responseData": "noData",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-format",
+      "name": "Formatar Mensagens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nfunction normalizarTel(tel) {\n  if (!tel) return null;\n  const digits = String(tel).replace(/\\D/g, '');\n  return digits.startsWith('55') ? digits : '55' + digits;\n}\n\nconst horario = new Date(d.timestamp).toLocaleString('pt-BR', {\n  timeZone: 'America/Recife',\n  day: '2-digit', month: '2-digit', year: 'numeric',\n  hour: '2-digit', minute: '2-digit'\n});\n\nconst emoji = d.tipo === 'temp_acima' ? '🔴'\n  : d.tipo === 'temp_abaixo' ? '🔵'\n  : d.tipo === 'teste_configuracao' ? '✅'\n  : '⚠️';\n\nconst locStr = d.localizacao ? ` (${d.localizacao})` : '';\n\nconst linhasWA = [\n  `${emoji} *ALERTA — Rizom Temp*`,\n  '',\n  `📍 *Equipamento:* ${d.equipamento}${locStr}`,\n  d.temperatura != null ? `🌡️ *Temperatura:* ${d.temperatura}°C` : null,\n  `📝 ${d.mensagem}`,\n  `🕐 *Horário:* ${horario}`,\n  '',\n  'Acesse o painel para verificar e reconhecer o alerta.',\n].filter(l => l !== null);\n\nconst tempRow = d.temperatura != null\n  ? `<tr><td style=\"padding:8px;border:1px solid #eee\"><b>Temperatura</b></td><td style=\"padding:8px;border:1px solid #eee\">${d.temperatura}°C</td></tr>`\n  : '';\n\nconst emailHtml = `<!DOCTYPE html><html><body style=\"font-family:sans-serif;color:#333\">\n<div style=\"max-width:600px;margin:0 auto\">\n  <h2 style=\"color:#d32f2f\">${emoji} Alerta de Temperatura — Rizom Temp</h2>\n  <table style=\"width:100%;border-collapse:collapse;margin-bottom:24px\">\n    <tr><td style=\"padding:8px;border:1px solid #eee\"><b>Empresa</b></td><td style=\"padding:8px;border:1px solid #eee\">${d.cliente_nome}</td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #eee\"><b>Equipamento</b></td><td style=\"padding:8px;border:1px solid #eee\">${d.equipamento}${locStr}</td></tr>\n    ${tempRow}\n    <tr><td style=\"padding:8px;border:1px solid #eee\"><b>Ocorrência</b></td><td style=\"padding:8px;border:1px solid #eee\">${d.mensagem}</td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #eee\"><b>Horário</b></td><td style=\"padding:8px;border:1px solid #eee\">${horario}</td></tr>\n  </table>\n  <p style=\"color:#666\">Acesse o painel do Rizom Temp para verificar e reconhecer o alerta.</p>\n</div></body></html>`;\n\nreturn [{ json: {\n  ...d,\n  telefone_normalizado: normalizarTel(d.cliente_telefone),\n  tem_telefone: Boolean(normalizarTel(d.cliente_telefone)),\n  tem_email: Boolean(d.cliente_email),\n  whatsapp_texto: linhasWA.join('\\n'),\n  email_html: emailHtml,\n  email_assunto: `[${emoji.replace(/\\s/g,'')}] ${d.equipamento} — ${d.mensagem.slice(0,60)}`,\n}}];"
+      }
+    },
+    {
+      "id": "node-if-tel",
+      "name": "Tem Telefone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.tem_telefone }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-if-email",
+      "name": "Tem Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 420],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.tem_email }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-whatsapp",
+      "name": "WhatsApp — Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://CONFIGURAR-URL-EVOLUTION/message/sendText/CONFIGURAR-INSTANCIA",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "CONFIGURAR-API-KEY" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.telefone_normalizado, textMessage: { text: $json.whatsapp_texto } }) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      }
+    },
+    {
+      "id": "node-email",
+      "name": "Enviar Email — SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [920, 420],
+      "parameters": {
+        "fromEmail": "CONFIGURAR-REMETENTE@seudominio.com",
+        "toEmail": "={{ $json.cliente_email }}",
+        "subject": "={{ $json.email_assunto }}",
+        "emailType": "html",
+        "message": "={{ $json.email_html }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURAR-ID-CREDENCIAL-SMTP",
+          "name": "SMTP Rizom Temp"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alerta Recebido": {
+      "main": [
+        [
+          { "node": "Formatar Mensagens", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Formatar Mensagens": {
+      "main": [
+        [
+          { "node": "Tem Telefone?", "type": "main", "index": 0 },
+          { "node": "Tem Email?",    "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Tem Telefone?": {
+      "main": [
+        [{ "node": "WhatsApp — Evolution API", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Tem Email?": {
+      "main": [
+        [{ "node": "Enviar Email — SMTP", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}
