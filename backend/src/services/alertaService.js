@@ -127,7 +127,7 @@ async function enviarNotificacao(payload) {
 // Job: verifica dispositivos offline (executado pelo scheduler)
 async function verificarDispositivosOffline() {
   const { rows } = await db.query(
-    `SELECT id, cliente_id, nome
+    `SELECT id, cliente_id, nome, localizacao, temp_min, temp_max
      FROM equipamentos
      WHERE ativo = true
        AND alerta_ativo = true
