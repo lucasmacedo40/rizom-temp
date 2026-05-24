@@ -406,7 +406,14 @@ function AbaUsuarios({
 
 // ─── Aba Alertas ──────────────────────────────────────────────────────────────
 
-function AbaAlertas({ alertas, isAdmin }: { alertas: AlertasConfiguracao; isAdmin: boolean }) {
+function AbaAlertas({
+  alertas, cliente, isAdmin, onIrParaEmpresa,
+}: {
+  alertas: AlertasConfiguracao;
+  cliente: ClienteConfiguracao;
+  isAdmin: boolean;
+  onIrParaEmpresa: () => void;
+}) {
   const [testando, setTestando] = useState(false);
   const [msgTeste, setMsgTeste] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
 
@@ -416,7 +423,7 @@ function AbaAlertas({ alertas, isAdmin }: { alertas: AlertasConfiguracao; isAdmi
     try {
       const { data } = await configuracoesApi.testarAlertas();
       setMsgTeste(data.ok
-        ? { tipo: 'ok', texto: 'Notificação de teste enviada com sucesso.' }
+        ? { tipo: 'ok', texto: 'Alerta de teste enviado com sucesso.' }
         : { tipo: 'erro', texto: data.erro ?? 'Webhook retornou erro.' }
       );
     } catch {
@@ -426,9 +433,61 @@ function AbaAlertas({ alertas, isAdmin }: { alertas: AlertasConfiguracao; isAdmi
     }
   }
 
+  const temTelefone = Boolean(cliente.telefone);
+  const temEmail = Boolean(cliente.email);
+  const podeTestar = alertas.webhook_configurado;
+
   const items: Array<{ label: string; valor: React.ReactNode }> = [
-    { label: 'Status do webhook', valor: <StatusPill ok={alertas.webhook_configurado} label={alertas.webhook_configurado ? 'Configurado' : 'Não configurado'} /> },
-    ...(alertas.webhook_mascarado ? [{ label: 'Endpoint', valor: <code style={{ fontSize: 12, color: 'var(--text-muted)' }}>{alertas.webhook_mascarado}</code> }] : []),
+    {
+      label: 'Webhook (n8n)',
+      valor: <StatusPill ok={alertas.webhook_configurado} label={alertas.webhook_configurado ? 'Configurado' : 'Não configurado'} />,
+    },
+    ...(alertas.webhook_mascarado ? [{
+      label: 'Endpoint',
+      valor: <code style={{ fontSize: 12, color: 'var(--text-muted)' }}>{alertas.webhook_mascarado}</code>,
+    }] : []),
+    {
+      label: 'WhatsApp',
+      valor: temTelefone
+        ? <StatusPill ok label={`Ativo — ${cliente.telefone}`} />
+        : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StatusPill ok={false} label="Sem telefone" />
+            {isAdmin && (
+              <button
+                onClick={onIrParaEmpresa}
+                style={{
+                  fontSize: 12, color: 'var(--rizom-blue)', background: 'none',
+                  border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0,
+                }}
+              >
+                Configurar na aba Empresa
+              </button>
+            )}
+          </span>
+        ),
+    },
+    {
+      label: 'Email',
+      valor: temEmail
+        ? <StatusPill ok label={`Ativo — ${cliente.email}`} />
+        : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StatusPill ok={false} label="Sem email" />
+            {isAdmin && (
+              <button
+                onClick={onIrParaEmpresa}
+                style={{
+                  fontSize: 12, color: 'var(--rizom-blue)', background: 'none',
+                  border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0,
+                }}
+              >
+                Configurar na aba Empresa
+              </button>
+            )}
+          </span>
+        ),
+    },
     { label: 'Timeout', valor: `${alertas.timeout_ms / 1000}s` },
     { label: 'Atraso padrão', valor: `${alertas.atraso_padrao_min} min` },
   ];
@@ -458,7 +517,7 @@ function AbaAlertas({ alertas, isAdmin }: { alertas: AlertasConfiguracao; isAdmi
             onClick={testar}
             loading={testando}
             loadingLabel="Enviando..."
-            disabled={!alertas.webhook_configurado}
+            disabled={!podeTestar}
             icon={Send}
           >
             Enviar alerta de teste
@@ -615,7 +674,14 @@ export default function Configuracoes() {
 
       {aba === 'empresa'  && cliente     && <AbaEmpresa   cliente={cliente} isAdmin={isAdmin} onUpdate={setCliente} />}
       {aba === 'usuarios'                && <AbaUsuarios  usuarios={usuarios} isAdmin={isAdmin} onRefresh={carregarUsuarios} />}
-      {aba === 'alertas'  && alertasCfg  && <AbaAlertas   alertas={alertasCfg} isAdmin={isAdmin} />}
+      {aba === 'alertas'  && alertasCfg && cliente && (
+        <AbaAlertas
+          alertas={alertasCfg}
+          cliente={cliente}
+          isAdmin={isAdmin}
+          onIrParaEmpresa={() => setAba('empresa')}
+        />
+      )}
       {aba === 'sistema'  && sistema     && <AbaSistema   sistema={sistema} />}
     </div>
   );
