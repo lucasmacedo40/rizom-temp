@@ -1,6 +1,6 @@
 // src/mqtt/client.js
 // Serviço MQTT — coração do sistema
-// Recebe leituras dos dispositivos ESP-01 e processa em tempo real
+// Recebe leituras MQTT dos dispositivos e processa em tempo real
 
 const mqtt = require('mqtt');
 const db = require('../db');

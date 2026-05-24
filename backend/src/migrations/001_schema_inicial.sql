@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS equipamentos (
   alerta_ativo    BOOLEAN NOT NULL DEFAULT true,
   alerta_atraso_min INTEGER NOT NULL DEFAULT 5,      -- minutos fora do limite antes de alertar
   -- Metadados do dispositivo IoT
-  device_id       VARCHAR(100) UNIQUE,               -- ex: "esp01_a1b2c3" (MAC do ESP-01)
+  device_id       VARCHAR(100) UNIQUE,               -- ex: "rz_a1b2c3"
   mqtt_topico     VARCHAR(200),                      -- ex: "rizomtemp/cliente_id/equip_id/temp"
   ultimo_heartbeat TIMESTAMPTZ,
   ativo           BOOLEAN NOT NULL DEFAULT true,

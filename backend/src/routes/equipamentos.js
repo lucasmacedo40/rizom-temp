@@ -46,7 +46,7 @@ router.post('/', autenticar, exigirPerfil('admin', 'operador'), async (req, res)
   }
 
   const limites = LIMITES_PADRAO[tipo] || LIMITES_PADRAO.outro;
-  const deviceId = `esp01_${uuidv4().replace(/-/g, '').slice(0, 8)}`;
+  const deviceId = `rz_${uuidv4().replace(/-/g, '').slice(0, 8)}`;
   const mqttTopico = `rizomtemp/${deviceId}/temperatura`;
 
   const { rows } = await db.query(
@@ -162,4 +162,3 @@ router.post('/:id/pareamento', autenticar, exigirPerfil('admin', 'operador'), as
 });
 
 module.exports = router;
-
