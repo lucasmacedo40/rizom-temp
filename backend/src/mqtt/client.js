@@ -85,11 +85,17 @@ async function processarMensagem(topico, payload) {
 }
 
 async function processarLeitura(deviceId, dados) {
-  // Payload esperado do ESP-01:
-  // { "t": 4.25 }  — formato compacto para economizar memória no ESP-01
-  // ou { "temperatura": 4.25, "v": "1.0" }
+  // Formatos aceitos:
+  //   RizomTemp ESP:  { "t": 4.25 }  ou  { "temperatura": 4.25 }
+  //   Monitorie SM-WT: { "Ch1": -7.0, "Ch2": null }  ou  { "ch1": -7.0 }
 
-  const temperatura = dados.t ?? dados.temperatura;
+  const temperatura =
+    dados.t ??
+    dados.temperatura ??
+    dados.Ch1 ??
+    dados.ch1 ??
+    dados.Ch2 ??
+    dados.ch2;
 
   if (temperatura === undefined || temperatura === null || isNaN(temperatura)) {
     console.warn(`[MQTT] Leitura inválida de ${deviceId}:`, dados);
