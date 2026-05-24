@@ -6,7 +6,7 @@ import {
   ReferenceLine, ResponsiveContainer, Legend,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, RefreshCw, Plus, Wifi } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Plus, Wifi, Pencil, X } from 'lucide-react';
 import ModalConfigurarDispositivo from '../components/ModalConfigurarDispositivo';
 import { equipamentosApi, leiturasApi } from '../api';
 import type { Equipamento, PontoGrafico } from '../api';
@@ -26,6 +26,9 @@ export default function EquipamentoDetalhe() {
   const [obsManual, setObsManual] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [showConfigurar, setShowConfigurar] = useState(false);
+  const [showEditar, setShowEditar] = useState(false);
+  const [formEditar, setFormEditar] = useState({ nome: '', localizacao: '', tipo: '', temp_min: 0, temp_max: 10 });
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -44,6 +47,24 @@ export default function EquipamentoDetalhe() {
     const interval = setInterval(carregar, 60000);
     return () => clearInterval(interval);
   }, [carregar]);
+
+  function abrirEditar() {
+    if (!equip) return;
+    setFormEditar({ nome: equip.nome, localizacao: equip.localizacao ?? '', tipo: equip.tipo, temp_min: equip.temp_min, temp_max: equip.temp_max });
+    setShowEditar(true);
+  }
+
+  async function salvarEdicao() {
+    if (!id) return;
+    setSalvandoEdicao(true);
+    try {
+      await equipamentosApi.atualizar(id, formEditar);
+      setShowEditar(false);
+      carregar();
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  }
 
   async function registrarManual() {
     if (!id || !tempManual) return;
@@ -123,6 +144,17 @@ export default function EquipamentoDetalhe() {
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button
+            onClick={abrirEditar}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', borderRadius: 8, padding: '8px 14px', fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            <Pencil size={13} /> Editar
+          </button>
           <button
             onClick={() => setShowConfigurar(true)}
             style={{
@@ -293,6 +325,113 @@ export default function EquipamentoDetalhe() {
                 opacity: (!tempManual || salvando) ? 0.6 : 1,
               }}>
                 {salvando ? 'Salvando...' : 'Registrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditar && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.28)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+        }} onClick={() => setShowEditar(false)}>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: 28, width: 420, maxWidth: 'calc(100vw - 32px)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 600 }}>Editar equipamento</h3>
+              <button onClick={() => setShowEditar(false)} style={{ background: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {([
+              { label: 'Nome *', key: 'nome', placeholder: 'Nome do equipamento' },
+              { label: 'Localização', key: 'localizacao', placeholder: 'Ex: Cozinha - fundo' },
+            ] as { label: string; key: 'nome' | 'localizacao'; placeholder: string }[]).map(({ label, key, placeholder }) => (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>{label}</label>
+                <input
+                  type="text"
+                  value={formEditar[key]}
+                  onChange={e => setFormEditar(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  style={{
+                    width: '100%', padding: '11px 14px', borderRadius: 8,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                />
+              </div>
+            ))}
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Tipo</label>
+              <select
+                value={formEditar.tipo}
+                onChange={e => setFormEditar(f => ({ ...f, tipo: e.target.value }))}
+                style={{
+                  width: '100%', padding: '11px 14px', borderRadius: 8,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+              >
+                {[
+                  { value: 'camara_fria', label: 'Câmara Fria' },
+                  { value: 'freezer', label: 'Freezer' },
+                  { value: 'refrigerador', label: 'Refrigerador' },
+                  { value: 'expositor', label: 'Expositor' },
+                  { value: 'outro', label: 'Outro' },
+                ].map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Temp. mínima (°C)</label>
+                <input
+                  type="number" step="0.5"
+                  value={formEditar.temp_min}
+                  onChange={e => setFormEditar(f => ({ ...f, temp_min: parseFloat(e.target.value) }))}
+                  style={{
+                    width: '100%', padding: '11px 14px', borderRadius: 8,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontSize: 15, textAlign: 'center',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Temp. máxima (°C)</label>
+                <input
+                  type="number" step="0.5"
+                  value={formEditar.temp_max}
+                  onChange={e => setFormEditar(f => ({ ...f, temp_max: parseFloat(e.target.value) }))}
+                  style={{
+                    width: '100%', padding: '11px 14px', borderRadius: 8,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontSize: 15, textAlign: 'center',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowEditar(false)} style={{
+                flex: 1, padding: '11px', borderRadius: 8,
+                background: 'var(--surface-2)', color: 'var(--text-secondary)', fontSize: 14,
+              }}>Cancelar</button>
+              <button
+                onClick={salvarEdicao}
+                disabled={!formEditar.nome || salvandoEdicao}
+                style={{
+                  flex: 1, padding: '11px', borderRadius: 8, fontWeight: 500,
+                  background: 'var(--rizom-blue)', color: 'white', fontSize: 14,
+                  opacity: (!formEditar.nome || salvandoEdicao) ? 0.6 : 1,
+                }}
+              >
+                {salvandoEdicao ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
