@@ -194,7 +194,13 @@ router.post('/alertas/teste', autenticar, exigirPerfil('admin'), async (req, res
     tipo: 'teste_configuracao',
     cliente_nome: cliente?.nome,
     cliente_telefone: cliente?.telefone,
-    mensagem: 'Teste de notificação do Rizom Temp',
+    cliente_email: cliente?.email,
+    equipamento: 'Teste de Configuração',
+    localizacao: null,
+    temperatura: null,
+    temp_min: null,
+    temp_max: null,
+    mensagem: 'Teste de notificação do Rizom Temp — configuração verificada com sucesso.',
     timestamp: new Date().toISOString(),
   };
 
