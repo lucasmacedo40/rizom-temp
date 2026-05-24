@@ -87,9 +87,13 @@ async function criarAlerta(equip, tipo, temperatura) {
       alerta_id: rows[0].id,
       cliente_nome: cliente?.nome,
       cliente_telefone: cliente?.telefone,
+      cliente_email: cliente?.email,
       equipamento: equip.nome,
+      localizacao: equip.localizacao ?? null,
       tipo,
       temperatura,
+      temp_min: equip.temp_min,
+      temp_max: equip.temp_max,
       mensagem,
       timestamp: new Date().toISOString(),
     });
