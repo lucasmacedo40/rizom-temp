@@ -115,7 +115,8 @@ async function enviarNotificacao(payload) {
         `UPDATE alertas SET notificado = true WHERE id = $1`,
         [payload.alerta_id]
       );
-      console.log(`[Alerta] Notificação enviada via n8n para ${payload.cliente_telefone}`);
+      const destinos = [payload.cliente_telefone, payload.cliente_email].filter(Boolean).join(', ');
+      console.log(`[Alerta] Notificação enviada via n8n para ${destinos || 'destinatários'}`);
     } else {
       console.warn(`[Alerta] n8n retornou ${res.status}`);
     }
