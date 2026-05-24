@@ -9,7 +9,7 @@ import { format, parseISO } from 'date-fns';
 import { ArrowLeft, RefreshCw, Plus, Wifi, Pencil, X } from 'lucide-react';
 import ModalConfigurarDispositivo from '../components/ModalConfigurarDispositivo';
 import { equipamentosApi, leiturasApi } from '../api';
-import type { Equipamento, PontoGrafico } from '../api';
+import type { Equipamento, PontoGrafico, TipoEquip } from '../api';
 
 const HORAS_OPCOES = [6, 12, 24, 48, 72];
 
@@ -27,7 +27,7 @@ export default function EquipamentoDetalhe() {
   const [salvando, setSalvando] = useState(false);
   const [showConfigurar, setShowConfigurar] = useState(false);
   const [showEditar, setShowEditar] = useState(false);
-  const [formEditar, setFormEditar] = useState({ nome: '', localizacao: '', tipo: '', temp_min: 0, temp_max: 10 });
+  const [formEditar, setFormEditar] = useState<{ nome: string; localizacao: string; tipo: TipoEquip; temp_min: number; temp_max: number }>({ nome: '', localizacao: '', tipo: 'outro', temp_min: 0, temp_max: 10 });
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -371,7 +371,7 @@ export default function EquipamentoDetalhe() {
               <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Tipo</label>
               <select
                 value={formEditar.tipo}
-                onChange={e => setFormEditar(f => ({ ...f, tipo: e.target.value }))}
+                onChange={e => setFormEditar(f => ({ ...f, tipo: e.target.value as TipoEquip }))}
                 style={{
                   width: '100%', padding: '11px 14px', borderRadius: 8,
                   background: 'var(--surface-2)', border: '1px solid var(--border)',
