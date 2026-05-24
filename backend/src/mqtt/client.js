@@ -86,36 +86,90 @@ async function processarMensagem(topico, payload) {
 
 async function processarLeitura(deviceId, dados) {
   // Formatos aceitos:
-  //   RizomTemp ESP:  { "t": 4.25 }  ou  { "temperatura": 4.25 }
-  //   Monitorie SM-WT: { "Ch1": -7.0, "Ch2": null }  ou  { "ch1": -7.0 }
+  //   RizomTemp ESP:    { "t": 4.25 }  ou  { "temperatura": 4.25 }
+  //   Monitorie SM-WT: { "variable": "t_canal1", "value": 24.93, "unit": "°C" }
+  //   (mensagens sem temperatura — info, rssi — são ignoradas silenciosamente)
 
-  const temperatura =
-    dados.t ??
-    dados.temperatura ??
-    dados.Ch1 ??
-    dados.ch1 ??
-    dados.Ch2 ??
-    dados.ch2;
-
-  if (temperatura === undefined || temperatura === null || isNaN(temperatura)) {
-    console.warn(`[MQTT] Leitura inválida de ${deviceId}:`, dados);
+  // Formato Monitorie: variável individual com unidade °C
+  if (dados.variable !== undefined) {
+    if (dados.unit !== '°C') return; // ignora umidade, rssi, etc.
+    const temperatura = normalizarTemperatura(dados.value);
+    if (temperatura === null) return;
+    const equip = await buscarEquipamentoPorDeviceId(deviceId);
+    if (!equip) { console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`); return; }
+    await registrarLeitura(equip, temperatura);
     return;
   }
 
-  // Busca equipamento pelo device_id
+  // Formato RizomTemp: campo t ou temperatura direto no objeto
+  const temperatura = normalizarTemperatura(dados.t ?? dados.temperatura);
+  if (temperatura !== null) {
+    const equip = await buscarEquipamentoPorDeviceId(deviceId);
+    if (!equip) { console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`); return; }
+    await registrarLeitura(equip, temperatura);
+    return;
+  }
+
+  // Payload sem temperatura reconhecível (ex: mensagem de info do Monitorie)
+  if (!dados.device) {
+    console.warn(`[MQTT] Leitura inválida de ${deviceId}:`, dados);
+  }
+}
+
+function normalizarTemperatura(valor) {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+async function buscarEquipamentoPorDeviceId(deviceId) {
   const { rows } = await db.query(
-    `SELECT id, cliente_id, nome, temp_min, temp_max, alerta_ativo, alerta_atraso_min
+    `SELECT id, cliente_id, nome, device_id, temp_min, temp_max, alerta_ativo, alerta_atraso_min,
+            tipo, localizacao, fabricante, modelo
      FROM equipamentos
      WHERE device_id = $1 AND ativo = true`,
     [deviceId]
   );
 
-  if (rows.length === 0) {
-    console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`);
-    return;
-  }
+  return rows[0] || null;
+}
 
-  const equip = rows[0];
+async function buscarOuCriarEquipamentoCanal(equipBase, canal) {
+  const canalLabel = canal.toUpperCase();
+  const deviceIdCanal = `${equipBase.device_id}_${canal}`;
+
+  const existente = await buscarEquipamentoPorDeviceId(deviceIdCanal);
+  if (existente) return existente;
+
+  const { rows } = await db.query(
+    `INSERT INTO equipamentos
+       (cliente_id, nome, tipo, localizacao, fabricante, modelo,
+        temp_min, temp_max, alerta_ativo, alerta_atraso_min,
+        device_id, mqtt_topico)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     ON CONFLICT (device_id) DO UPDATE SET ativo = true
+     RETURNING id, cliente_id, nome, temp_min, temp_max, alerta_ativo, alerta_atraso_min`,
+    [
+      equipBase.cliente_id,
+      `${equipBase.nome} - ${canalLabel}`,
+      equipBase.tipo,
+      equipBase.localizacao,
+      equipBase.fabricante,
+      equipBase.modelo,
+      equipBase.temp_min,
+      equipBase.temp_max,
+      equipBase.alerta_ativo,
+      equipBase.alerta_atraso_min,
+      deviceIdCanal,
+      `rizomtemp/${equipBase.device_id}/temperatura`,
+    ]
+  );
+
+  console.log(`[MQTT] Equipamento ${canalLabel} criado para ${equipBase.nome}: ${deviceIdCanal}`);
+  return rows[0];
+}
+
+async function registrarLeitura(equip, temperatura) {
   const dentroLimite = temperatura >= equip.temp_min && temperatura <= equip.temp_max;
 
   // Persiste leitura
