@@ -86,13 +86,23 @@ async function processarMensagem(topico, payload) {
 
 async function processarLeitura(deviceId, dados) {
   // Formatos aceitos:
-  //   RizomTemp ESP:    { "t": 4.25 }  ou  { "temperatura": 4.25 }
-  //   Monitorie SM-WT: { "variable": "t_canal1", "value": 24.93, "unit": "°C" }
-  //   (mensagens sem temperatura — info, rssi — são ignoradas silenciosamente)
+  //   RizomTemp ESP:          { "t": 4.25 }  ou  { "temperatura": 4.25 }
+  //   Monitorie SM-WT (único):{ "id": "...", "t_canal1": "24.75", "t_canal2": "24.37", "rssi_wifi": "-49.00" }
+  //   Monitorie SM-WT (sep.): { "variable": "t_canal1", "value": 24.93, "unit": "°C" }
 
-  // Formato Monitorie: variável individual com unidade °C
+  // Monitorie — payload único: { t_canal1, t_canal2, rssi_wifi, id }
+  if (dados.t_canal1 !== undefined) {
+    const temperatura = normalizarTemperatura(dados.t_canal1);
+    if (temperatura === null) return;
+    const equip = await buscarEquipamentoPorDeviceId(deviceId);
+    if (!equip) { console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`); return; }
+    await registrarLeitura(equip, temperatura);
+    return;
+  }
+
+  // Monitorie — payloads separados: { variable, value, unit }
   if (dados.variable !== undefined) {
-    if (dados.unit !== '°C') return; // ignora umidade, rssi, etc.
+    if (dados.unit !== '°C') return;
     const temperatura = normalizarTemperatura(dados.value);
     if (temperatura === null) return;
     const equip = await buscarEquipamentoPorDeviceId(deviceId);
@@ -101,7 +111,7 @@ async function processarLeitura(deviceId, dados) {
     return;
   }
 
-  // Formato RizomTemp: campo t ou temperatura direto no objeto
+  // RizomTemp ESP: { t } ou { temperatura }
   const temperatura = normalizarTemperatura(dados.t ?? dados.temperatura);
   if (temperatura !== null) {
     const equip = await buscarEquipamentoPorDeviceId(deviceId);
@@ -110,8 +120,7 @@ async function processarLeitura(deviceId, dados) {
     return;
   }
 
-  // Payload sem temperatura reconhecível (ex: mensagem de info do Monitorie)
-  if (!dados.device) {
+  if (!dados.device && !dados.id) {
     console.warn(`[MQTT] Leitura inválida de ${deviceId}:`, dados);
   }
 }
