@@ -91,12 +91,13 @@ async function processarLeitura(deviceId, dados) {
   //   Monitorie SM-WT (sep.): { "variable": "t_canal1", "value": 24.93, "unit": "°C" }
 
   // Monitorie — payload único: { t_canal1, t_canal2, rssi_wifi, id }
-  if (dados.t_canal1 !== undefined) {
-    const temperatura = normalizarTemperatura(dados.t_canal1);
-    if (temperatura === null) return;
+  if (dados.t_canal1 !== undefined || dados.t_canal2 !== undefined) {
     const equip = await buscarEquipamentoPorDeviceId(deviceId);
     if (!equip) { console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`); return; }
-    await registrarLeitura(equip, temperatura);
+    await registrarLeiturasCanais(equip, {
+      ch1: dados.t_canal1,
+      ch2: dados.t_canal2,
+    });
     return;
   }
 
@@ -107,7 +108,11 @@ async function processarLeitura(deviceId, dados) {
     if (temperatura === null) return;
     const equip = await buscarEquipamentoPorDeviceId(deviceId);
     if (!equip) { console.warn(`[MQTT] Dispositivo desconhecido: ${deviceId}`); return; }
-    await registrarLeitura(equip, temperatura);
+    const variavel = String(dados.variable).toLowerCase();
+    const equipCanal = variavel.includes('canal2') || variavel.includes('ch2')
+      ? await buscarOuCriarEquipamentoCanal(equip, 'ch2')
+      : equip;
+    await registrarLeitura(equipCanal, temperatura);
     return;
   }
 
@@ -122,6 +127,20 @@ async function processarLeitura(deviceId, dados) {
 
   if (!dados.device && !dados.id) {
     console.warn(`[MQTT] Leitura inválida de ${deviceId}:`, dados);
+  }
+}
+
+async function registrarLeiturasCanais(equipBase, canais) {
+  const ch1 = normalizarTemperatura(canais.ch1);
+  const ch2 = normalizarTemperatura(canais.ch2);
+
+  if (ch1 !== null) {
+    await registrarLeitura(equipBase, ch1);
+  }
+
+  if (ch2 !== null) {
+    const equipCh2 = await buscarOuCriarEquipamentoCanal(equipBase, 'ch2');
+    await registrarLeitura(equipCh2, ch2);
   }
 }
 
