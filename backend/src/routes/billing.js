@@ -71,6 +71,7 @@ router.post('/checkout-session', autenticar, exigirPerfil('admin'), async (req, 
       customer: customerId,
       client_reference_id: cliente.id,
       billing_address_collection: 'required',
+      allow_promotion_codes: true,
       tax_id_collection: { enabled: true },
       customer_update: {
         name: 'auto',
