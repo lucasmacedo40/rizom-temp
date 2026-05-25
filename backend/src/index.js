@@ -17,6 +17,8 @@ const alertasRoutes = require('./routes/alertas');
 const relatoriosRoutes = require('./routes/relatorios');
 const provisioningRoutes = require('./routes/provisioning');
 const configuracoesRoutes = require('./routes/configuracoes');
+const billingRoutes = require('./routes/billing');
+const stripeWebhookRoutes = require('./routes/stripeWebhook');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -30,6 +32,10 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
   credentials: true,
 }));
+
+// Stripe exige o corpo bruto para validar a assinatura do webhook.
+app.use('/webhooks/stripe', stripeWebhookRoutes);
+
 app.use(express.json({ limit: '1mb' }));
 
 // Rate limiting geral
@@ -60,6 +66,7 @@ app.use('/provisioning', rateLimit({
 }));
 app.use('/provisioning', provisioningRoutes);
 app.use('/configuracoes', configuracoesRoutes);
+app.use('/billing', billingRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -74,7 +81,7 @@ app.use((req, res) => {
 // Erro global
 app.use((err, req, res, next) => {
   console.error('[API] Erro não tratado:', err.message);
-  res.status(500).json({ erro: 'Erro interno do servidor' });
+  res.status(err.status || 500).json({ erro: err.status ? err.message : 'Erro interno do servidor' });
 });
 
 // ─── Jobs agendados ───────────────────────────────────────────────────────────

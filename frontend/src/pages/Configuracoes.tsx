@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Building2, Users, Bell, Server, Save, Send, RefreshCw, Plus } from 'lucide-react';
+import { Building2, Users, Bell, Server, Save, Send, RefreshCw, Plus, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   configuracoesApi,
+  billingApi,
   type ClienteConfiguracao,
   type UsuarioConfiguracao,
   type AlertasConfiguracao,
   type SistemaConfiguracao,
+  type BillingStatus,
+  type PlanoBilling,
+  type CicloBilling,
 } from '../api';
 import { useAuth } from '../contexts/useAuth';
 
-type Aba = 'empresa' | 'usuarios' | 'alertas' | 'sistema';
+type Aba = 'empresa' | 'usuarios' | 'alertas' | 'pagamento' | 'sistema';
 
 // ─── Componentes utilitários ──────────────────────────────────────────────────
 
@@ -104,6 +108,34 @@ function PrimaryBtn({ onClick, disabled, loading, loadingLabel, icon: Icon, chil
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
         background: 'var(--rizom-blue)', color: '#fff', fontWeight: 600, fontSize: 14,
+        opacity: (disabled || loading) ? 0.6 : 1,
+      }}
+    >
+      {Icon && <Icon size={14} />}
+      {loading && loadingLabel ? loadingLabel : children}
+    </button>
+  );
+}
+
+function SecondaryBtn({ onClick, disabled, loading, loadingLabel, icon: Icon, children }: {
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingLabel?: string;
+  icon?: React.FC<{ size?: number }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 16px', borderRadius: 6,
+        border: '1px solid var(--border)',
+        background: 'var(--surface)', color: 'var(--text-primary)',
+        fontWeight: 600, fontSize: 14, cursor: 'pointer',
         opacity: (disabled || loading) ? 0.6 : 1,
       }}
     >
@@ -593,6 +625,224 @@ function AbaSistema({ sistema: inicial }: { sistema: SistemaConfiguracao }) {
   );
 }
 
+// ─── Aba Pagamento ───────────────────────────────────────────────────────────
+
+const PLANOS: Array<{ id: PlanoBilling; nome: string; mensal: number; anual: number }> = [
+  { id: 'starter', nome: 'Starter', mensal: 170, anual: 1700 },
+  { id: 'operador', nome: 'Operador', mensal: 290, anual: 2900 },
+  { id: 'master', nome: 'Master', mensal: 490, anual: 4900 },
+];
+
+const STATUS_BILLING: Record<string, { label: string; ok: boolean }> = {
+  active: { label: 'Ativa', ok: true },
+  trialing: { label: 'Teste grátis', ok: true },
+  past_due: { label: 'Pagamento pendente', ok: false },
+  unpaid: { label: 'Inadimplente', ok: false },
+  canceled: { label: 'Cancelada', ok: false },
+  incomplete: { label: 'Incompleta', ok: false },
+  incomplete_expired: { label: 'Expirada', ok: false },
+  sem_assinatura: { label: 'Sem assinatura', ok: false },
+};
+
+function formatarData(valor?: string | null) {
+  return valor ? format(new Date(valor), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—';
+}
+
+function formatarMoeda(valor: number) {
+  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function AbaPagamento({
+  billing,
+  isAdmin,
+  onRefresh,
+}: {
+  billing: BillingStatus;
+  isAdmin: boolean;
+  onRefresh: () => Promise<void>;
+}) {
+  const [plano, setPlano] = useState<PlanoBilling>(billing.plano || 'starter');
+  const [ciclo, setCiclo] = useState<CicloBilling>(billing.ciclo || 'monthly');
+  const [acao, setAcao] = useState<'checkout' | 'portal' | null>(null);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+  const statusCfg = STATUS_BILLING[billing.status] || { label: billing.status, ok: false };
+  const planoSelecionado = PLANOS.find(p => p.id === plano) || PLANOS[0];
+  const temAssinaturaAberta = Boolean(
+    billing.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(billing.status)
+  );
+
+  async function iniciarCheckout() {
+    setAcao('checkout');
+    setMsg(null);
+    try {
+      const { data } = await billingApi.checkout({ plano, ciclo });
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      const texto = (err as { response?: { data?: { erro?: string } } })
+        ?.response?.data?.erro ?? 'Erro ao iniciar checkout.';
+      setMsg({ tipo: 'erro', texto });
+      setAcao(null);
+    }
+  }
+
+  async function abrirPortal() {
+    setAcao('portal');
+    setMsg(null);
+    try {
+      const { data } = await billingApi.portal();
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      const texto = (err as { response?: { data?: { erro?: string } } })
+        ?.response?.data?.erro ?? 'Erro ao abrir portal de cobrança.';
+      setMsg({ tipo: 'erro', texto });
+      setAcao(null);
+    }
+  }
+
+  const rows: Array<{ label: string; valor: React.ReactNode }> = [
+    { label: 'Status', valor: <StatusPill ok={statusCfg.ok && !billing.bloqueado} label={billing.bloqueado ? 'Bloqueada' : statusCfg.label} /> },
+    { label: 'Plano atual', valor: billing.plano },
+    { label: 'Ciclo', valor: billing.ciclo === 'yearly' ? 'Anual' : billing.ciclo === 'monthly' ? 'Mensal' : '—' },
+    { label: 'Fim do teste', valor: formatarData(billing.trial_end) },
+    { label: 'Próxima renovação', valor: formatarData(billing.current_period_end) },
+    { label: 'Cancelamento ao fim do período', valor: billing.cancel_at_period_end ? 'Sim' : 'Não' },
+    { label: 'Bloqueio programado', valor: formatarData(billing.bloquear_em) },
+  ];
+
+  return (
+    <>
+      <SectionCard title="Assinatura">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginBottom: 20 }}>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.label} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontWeight: 500, width: '40%' }}>
+                  {r.label}
+                </td>
+                <td style={{ padding: '10px 12px' }}>{r.valor}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {billing.status === 'past_due' && billing.bloquear_em && (
+          <div style={{
+            padding: 12, borderRadius: 6, background: 'var(--alerta-bg)',
+            color: 'var(--alerta)', fontSize: 13, marginBottom: 16,
+          }}>
+            Há uma pendência de pagamento. O acesso será bloqueado em {formatarData(billing.bloquear_em)} se a cobrança não for regularizada.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {isAdmin && billing.stripe_customer_id && (
+            <SecondaryBtn
+              onClick={abrirPortal}
+              loading={acao === 'portal'}
+              loadingLabel="Abrindo..."
+              icon={CreditCard}
+            >
+              Gerenciar cobrança
+            </SecondaryBtn>
+          )}
+          <SecondaryBtn onClick={onRefresh} disabled={Boolean(acao)} icon={RefreshCw}>
+            Atualizar status
+          </SecondaryBtn>
+        </div>
+      </SectionCard>
+
+      {isAdmin && (
+        <SectionCard title="Assinar ou alterar plano">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 12,
+            marginBottom: 16,
+          }}>
+            {PLANOS.map(p => {
+              const active = plano === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPlano(p.id)}
+                  style={{
+                    textAlign: 'left', padding: 14, borderRadius: 8,
+                    border: `1px solid ${active ? 'var(--rizom-blue)' : 'var(--border)'}`,
+                    background: active ? 'var(--rizom-mist)' : 'var(--surface)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{p.nome}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                    {formatarMoeda(p.mensal)}/mês
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                    {formatarMoeda(p.anual)}/ano
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            {(['monthly', 'yearly'] as const).map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCiclo(c)}
+                style={{
+                  padding: '8px 12px', borderRadius: 6,
+                  border: `1px solid ${ciclo === c ? 'var(--rizom-blue)' : 'var(--border)'}`,
+                  background: ciclo === c ? 'var(--rizom-blue)' : 'var(--surface)',
+                  color: ciclo === c ? '#fff' : 'var(--text-primary)',
+                  cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                {c === 'monthly' ? 'Mensal' : 'Anual'}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <PrimaryBtn
+              onClick={iniciarCheckout}
+              loading={acao === 'checkout'}
+              loadingLabel="Redirecionando..."
+              disabled={!billing.prices_configured || temAssinaturaAberta}
+              icon={CreditCard}
+            >
+              Ir para pagamento: {formatarMoeda(ciclo === 'monthly' ? planoSelecionado.mensal : planoSelecionado.anual)}
+            </PrimaryBtn>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Inclui 7 dias grátis.
+            </span>
+          </div>
+
+          {!billing.prices_configured && (
+            <p style={{ fontSize: 13, color: 'var(--danger)', marginTop: 12 }}>
+              Preços da Stripe ainda não configurados no servidor.
+            </p>
+          )}
+
+          {temAssinaturaAberta && (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 12 }}>
+              Para alterar plano, forma de pagamento ou cancelamento, use o botão Gerenciar cobrança.
+            </p>
+          )}
+
+          {msg && (
+            <p style={{ fontSize: 13, color: msg.tipo === 'ok' ? 'var(--ok)' : 'var(--danger)', marginTop: 12 }}>
+              {msg.texto}
+            </p>
+          )}
+        </SectionCard>
+      )}
+    </>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function Configuracoes() {
@@ -606,6 +856,7 @@ export default function Configuracoes() {
   const [cliente, setCliente] = useState<ClienteConfiguracao | null>(null);
   const [usuarios, setUsuarios] = useState<UsuarioConfiguracao[]>([]);
   const [alertasCfg, setAlertasCfg] = useState<AlertasConfiguracao | null>(null);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [sistema, setSistema] = useState<SistemaConfiguracao | null>(null);
 
   async function carregarUsuarios() {
@@ -613,18 +864,31 @@ export default function Configuracoes() {
     setUsuarios(data);
   }
 
+  async function carregarBilling() {
+    const { data } = await billingApi.status();
+    setBilling(data);
+  }
+
   useEffect(() => {
     (async () => {
       try {
-        const [cRes, uRes, aRes, sRes] = await Promise.all([
+        const params = new URLSearchParams(window.location.search);
+        const abaParam = params.get('aba') as Aba | null;
+        if (abaParam && ['empresa', 'usuarios', 'alertas', 'pagamento', 'sistema'].includes(abaParam)) {
+          setAba(abaParam);
+        }
+
+        const [cRes, uRes, aRes, bRes, sRes] = await Promise.all([
           configuracoesApi.cliente(),
           configuracoesApi.usuarios(),
           configuracoesApi.alertas(),
+          billingApi.status(),
           configuracoesApi.sistema(),
         ]);
         setCliente(cRes.data);
         setUsuarios(uRes.data);
         setAlertasCfg(aRes.data);
+        setBilling(bRes.data);
         setSistema(sRes.data);
       } catch {
         setErro('Erro ao carregar configurações. Tente recarregar a página.');
@@ -650,6 +914,7 @@ export default function Configuracoes() {
     { id: 'empresa',  label: 'Empresa',  icon: Building2 },
     { id: 'usuarios', label: 'Usuários', icon: Users },
     { id: 'alertas',  label: 'Alertas',  icon: Bell },
+    { id: 'pagamento', label: 'Pagamento', icon: CreditCard },
     { id: 'sistema',  label: 'Sistema',  icon: Server },
   ];
 
@@ -680,6 +945,13 @@ export default function Configuracoes() {
           cliente={cliente}
           isAdmin={isAdmin}
           onIrParaEmpresa={() => setAba('empresa')}
+        />
+      )}
+      {aba === 'pagamento' && billing && (
+        <AbaPagamento
+          billing={billing}
+          isAdmin={isAdmin}
+          onRefresh={carregarBilling}
         />
       )}
       {aba === 'sistema'  && sistema     && <AbaSistema   sistema={sistema} />}

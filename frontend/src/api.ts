@@ -182,6 +182,30 @@ export interface SistemaConfiguracao {
   };
 }
 
+export type PlanoBilling = 'starter' | 'operador' | 'master';
+export type CicloBilling = 'monthly' | 'yearly';
+
+export interface BillingStatus {
+  cliente_id: string;
+  cliente_nome: string;
+  email: string;
+  plano: PlanoBilling;
+  ciclo?: CicloBilling | null;
+  status: string;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  stripe_price_id?: string | null;
+  trial_end?: string | null;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at?: string | null;
+  inadimplente_desde?: string | null;
+  bloquear_em?: string | null;
+  bloqueado: boolean;
+  prices_configured: boolean;
+}
+
 // ─── API: Configurações ───────────────────────────────────────────────────────
 
 export const configuracoesApi = {
@@ -201,4 +225,13 @@ export const configuracoesApi = {
     api.post<{ ok: boolean; status?: number; erro?: string }>('/configuracoes/alertas/teste'),
   sistema: () =>
     api.get<SistemaConfiguracao>('/configuracoes/sistema'),
+};
+
+export const billingApi = {
+  status: () =>
+    api.get<BillingStatus>('/billing/status'),
+  checkout: (dados: { plano: PlanoBilling; ciclo: CicloBilling }) =>
+    api.post<{ url: string }>('/billing/checkout-session', dados),
+  portal: () =>
+    api.post<{ url: string }>('/billing/portal-session'),
 };
