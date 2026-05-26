@@ -89,7 +89,13 @@ function obterPriceId(plano, ciclo) {
 }
 
 function planoPorPrice(priceId) {
-  return PRICE_TO_PLAN[priceId] || { plano: 'starter', ciclo: null };
+  const mapped = PRICE_TO_PLAN[priceId];
+  if (!mapped) {
+    const err = new Error(`Price Stripe não configurado no sistema: ${priceId || 'vazio'}`);
+    err.code = 'STRIPE_PRICE_DESCONHECIDO';
+    throw err;
+  }
+  return mapped;
 }
 
 async function vincularStripeCustomer(clienteId, customerId) {
@@ -116,7 +122,18 @@ async function upsertAssinaturaPorSubscription(subscription) {
 
   const item = subscription.items?.data?.[0];
   const priceId = item?.price?.id || null;
-  const { plano, ciclo } = planoPorPrice(priceId);
+  let planoInfo;
+  try {
+    planoInfo = planoPorPrice(priceId);
+  } catch (err) {
+    console.error('[Stripe] Subscription com price desconhecido:', {
+      subscription_id: subscription.id,
+      customer_id: customerId,
+      price_id: priceId,
+    });
+    throw err;
+  }
+  const { plano, ciclo } = planoInfo;
 
   const atual = await db.query(
     `SELECT inadimplente_desde FROM assinaturas WHERE cliente_id = $1`,
@@ -240,6 +257,63 @@ async function marcarPagamentoFalhou(subscriptionId) {
   );
 }
 
+async function sincronizarBloqueiosVencidos() {
+  const { rows } = await db.query(
+    `UPDATE assinaturas
+        SET bloqueado = true
+      WHERE bloqueado = false
+        AND bloquear_em IS NOT NULL
+        AND bloquear_em <= NOW()
+      RETURNING cliente_id`
+  );
+
+  if (rows.length === 0) return 0;
+
+  await db.query(
+    `UPDATE clientes
+        SET billing_bloqueado = true
+      WHERE id = ANY($1::uuid[])`,
+    [rows.map(r => r.cliente_id)]
+  );
+
+  return rows.length;
+}
+
+async function verificarAcessoCliente(clienteId) {
+  await sincronizarBloqueiosVencidos();
+
+  const { rows } = await db.query(
+    `SELECT c.billing_bloqueado,
+            COALESCE(a.bloqueado, false) AS assinatura_bloqueada,
+            COALESCE(a.status, c.billing_status, 'sem_assinatura') AS status,
+            COALESCE(a.bloquear_em, c.billing_bloquear_em) AS bloquear_em
+       FROM clientes c
+       LEFT JOIN assinaturas a ON a.cliente_id = c.id
+      WHERE c.id = $1`,
+    [clienteId]
+  );
+
+  const row = rows[0];
+  if (!row) return { permitido: false, status: 'cliente_nao_encontrado' };
+
+  const bloqueadoPorData = row.bloquear_em && new Date(row.bloquear_em) <= new Date();
+  const bloqueado = Boolean(row.billing_bloqueado || row.assinatura_bloqueada || bloqueadoPorData);
+
+  if (bloqueado && !row.billing_bloqueado) {
+    await db.query(
+      `UPDATE clientes SET billing_bloqueado = true WHERE id = $1`,
+      [clienteId]
+    );
+  }
+
+  return {
+    permitido: !bloqueado,
+    status: row.status,
+    bloquear_em: row.bloquear_em,
+    bloqueado,
+  };
+}
+
 async function registrarEventoStripe(event) {
   const { rowCount } = await db.query(
     `INSERT INTO stripe_events (id, tipo, payload)
@@ -258,5 +332,7 @@ module.exports = {
   upsertAssinaturaPorSubscription,
   marcarPagamentoOk,
   marcarPagamentoFalhou,
+  sincronizarBloqueiosVencidos,
+  verificarAcessoCliente,
   registrarEventoStripe,
 };

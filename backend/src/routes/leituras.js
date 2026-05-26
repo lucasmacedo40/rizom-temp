@@ -2,6 +2,7 @@
 const express = require('express');
 const db = require('../db');
 const { autenticar, exigirPerfil } = require('../middleware/auth');
+const { exigirBillingAtivo } = require('../middleware/billing');
 
 const router = express.Router();
 
@@ -101,7 +102,7 @@ router.get('/grafico', autenticar, async (req, res) => {
 });
 
 // POST /leituras/manual — registro manual (sem IoT)
-router.post('/manual', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
+router.post('/manual', autenticar, exigirBillingAtivo, exigirPerfil('admin', 'operador'), async (req, res) => {
   const { equipamento_id, temperatura, observacao } = req.body;
 
   if (!equipamento_id || temperatura === undefined) {

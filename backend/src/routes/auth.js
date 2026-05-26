@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { autenticar, exigirPerfil } = require('../middleware/auth');
+const { exigirBillingAtivo } = require('../middleware/billing');
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ router.get('/me', autenticar, async (req, res) => {
 });
 
 // POST /auth/usuarios — cria usuário (somente admin)
-router.post('/usuarios', autenticar, exigirPerfil('admin'), async (req, res) => {
+router.post('/usuarios', autenticar, exigirBillingAtivo, exigirPerfil('admin'), async (req, res) => {
   const { nome, email, senha, perfil = 'operador' } = req.body;
 
   if (!nome || !email || !senha) {

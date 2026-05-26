@@ -3,6 +3,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { autenticar, exigirPerfil } = require('../middleware/auth');
+const { exigirBillingAtivo } = require('../middleware/billing');
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ router.get('/:id', autenticar, async (req, res) => {
 });
 
 // POST /equipamentos — cadastra equipamento
-router.post('/', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
+router.post('/', autenticar, exigirBillingAtivo, exigirPerfil('admin', 'operador'), async (req, res) => {
   const { nome, tipo, localizacao, fabricante, modelo, temp_min, temp_max } = req.body;
 
   if (!nome || !tipo) {
@@ -67,7 +68,7 @@ router.post('/', autenticar, exigirPerfil('admin', 'operador'), async (req, res)
 });
 
 // PATCH /equipamentos/:id — atualiza equipamento
-router.patch('/:id', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
+router.patch('/:id', autenticar, exigirBillingAtivo, exigirPerfil('admin', 'operador'), async (req, res) => {
   const { nome, localizacao, temp_min, temp_max, alerta_ativo, alerta_atraso_min } = req.body;
 
   const { rows } = await db.query(
@@ -89,7 +90,7 @@ router.patch('/:id', autenticar, exigirPerfil('admin', 'operador'), async (req, 
 });
 
 // DELETE /equipamentos/:id — desativa (soft delete)
-router.delete('/:id', autenticar, exigirPerfil('admin'), async (req, res) => {
+router.delete('/:id', autenticar, exigirBillingAtivo, exigirPerfil('admin'), async (req, res) => {
   await db.query(
     `UPDATE equipamentos SET ativo = false WHERE id = $1 AND cliente_id = $2`,
     [req.params.id, req.usuario.cliente_id]
@@ -121,7 +122,7 @@ router.get('/:id/config-dispositivo', autenticar, async (req, res) => {
 });
 
 // POST /equipamentos/:id/pareamento — gera código de 6 dígitos para provisioning
-router.post('/:id/pareamento', autenticar, exigirPerfil('admin', 'operador'), async (req, res) => {
+router.post('/:id/pareamento', autenticar, exigirBillingAtivo, exigirPerfil('admin', 'operador'), async (req, res) => {
   const { id } = req.params;
 
   // Verifica se o equipamento pertence ao cliente

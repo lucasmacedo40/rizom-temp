@@ -8,11 +8,12 @@ const { format, startOfMonth, endOfMonth, parseISO } = require('date-fns');
 const { ptBR } = require('date-fns/locale');
 const db = require('../db');
 const { autenticar } = require('../middleware/auth');
+const { exigirBillingAtivo } = require('../middleware/billing');
 
 const router = express.Router();
 
 // GET /relatorios/mensal?mes=2024-12&equipamento_id= (opcional)
-router.get('/mensal', autenticar, async (req, res) => {
+router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
   const { mes, equipamento_id } = req.query;
 
   // Determina período

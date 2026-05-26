@@ -9,6 +9,7 @@ const cron = require('node-cron');
 
 const mqttClient = require('./mqtt/client');
 const alertaService = require('./services/alertaService');
+const billingService = require('./services/billingService');
 
 const authRoutes = require('./routes/auth');
 const equipamentosRoutes = require('./routes/equipamentos');
@@ -91,6 +92,18 @@ cron.schedule('*/5 * * * *', async () => {
     await alertaService.verificarDispositivosOffline();
   } catch (err) {
     console.error('[Cron] Erro ao verificar dispositivos offline:', err.message);
+  }
+});
+
+// Efetiva bloqueios de assinatura que passaram da carência
+cron.schedule('*/15 * * * *', async () => {
+  try {
+    const total = await billingService.sincronizarBloqueiosVencidos();
+    if (total > 0) {
+      console.warn(`[Cron] Assinaturas bloqueadas por inadimplência: ${total}`);
+    }
+  } catch (err) {
+    console.error('[Cron] Erro ao sincronizar bloqueios de billing:', err.message);
   }
 });
 

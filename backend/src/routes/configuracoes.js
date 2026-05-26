@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const db = require('../db');
 const { autenticar, exigirPerfil } = require('../middleware/auth');
+const { exigirBillingAtivo } = require('../middleware/billing');
 const mqttClient = require('../mqtt/client');
 const pkg = require('../../package.json');
 
@@ -86,7 +87,7 @@ router.get('/usuarios', autenticar, async (req, res) => {
   res.json(rows);
 });
 
-router.post('/usuarios', autenticar, exigirPerfil('admin'), async (req, res) => {
+router.post('/usuarios', autenticar, exigirBillingAtivo, exigirPerfil('admin'), async (req, res) => {
   const nome = trimOrNull(req.body.nome);
   const email = trimOrNull(req.body.email);
   const senha = req.body.senha;
