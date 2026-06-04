@@ -124,6 +124,9 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
       nomePeriodo = 'Últimos 7 dias';
     } else {
       const refDate = periodoParam ? parseISO(`${periodoParam}-01`) : new Date();
+      if (periodoParam && isNaN(refDate.getTime())) {
+        return res.status(400).json({ erro: 'Parâmetro "periodo" inválido. Use YYYY-MM ou "semana".' });
+      }
       inicio      = startOfMonth(refDate);
       fim         = endOfMonth(refDate);
       nomePeriodo = format(refDate, 'MMMM yyyy', { locale: ptBR });
