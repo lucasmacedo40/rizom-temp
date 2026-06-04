@@ -270,7 +270,7 @@ function drawTableRow(doc, columns, values, rowIndex) {
   doc.y = startY + rowHeight;
 }
 
-async function buscarLeiturasAgregadas(equipamentoId, inicio, fim, granularidade) {
+async function buscarLeiturasAgregadas(equipamentoId, inicio, fim, granularidade, tempMin, tempMax) {
   let bucketExpr;
   switch (granularidade) {
     case '1h':
@@ -292,14 +292,14 @@ async function buscarLeiturasAgregadas(equipamentoId, inicio, fim, granularidade
     `SELECT
        (${bucketExpr}) AS ts,
        ROUND(AVG(l.temperatura)::numeric, 2) AS avg_temp,
-       bool_or(NOT l.dentro_limite)           AS tem_violacao
+       bool_or(l.temperatura NOT BETWEEN $4 AND $5) AS tem_violacao
      FROM leituras l
      WHERE l.equipamento_id = $1
        AND l.registrado_em BETWEEN $2 AND $3
        AND l.temperatura <> -127
      GROUP BY 1
      ORDER BY 1`,
-    [equipamentoId, inicio, fim]
+    [equipamentoId, inicio, fim, tempMin, tempMax]
   );
   return rows;
 }
@@ -350,7 +350,7 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
       `SELECT e.id, e.nome, e.tipo, e.localizacao, e.fabricante, e.modelo,
               e.temp_min, e.temp_max,
               COUNT(l.id)                                        AS total_leituras,
-              COUNT(l.id) FILTER (WHERE NOT l.dentro_limite)    AS leituras_alerta,
+              COUNT(l.id) FILTER (WHERE l.temperatura NOT BETWEEN e.temp_min AND e.temp_max) AS leituras_alerta,
               ROUND(AVG(l.temperatura)::numeric, 2)             AS media,
               MIN(l.temperatura)                                AS minima,
               MAX(l.temperatura)                                AS maxima
@@ -536,15 +536,16 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
     for (const equip of equipamentos) {
       // Fetch aggregated readings and alerts for this equipment
       const [pontos, alertasEquip] = await Promise.all([
-        buscarLeiturasAgregadas(equip.id, inicio, fim, granularidade),
+        buscarLeiturasAgregadas(equip.id, inicio, fim, granularidade, equip.temp_min, equip.temp_max),
         db.query(
           `SELECT a.tipo, a.temperatura, a.mensagem, a.criado_em
            FROM alertas a
            WHERE a.equipamento_id = $1
              AND a.criado_em BETWEEN $2 AND $3
+             AND (a.temperatura > $4 OR a.temperatura < $5)
            ORDER BY a.criado_em DESC
            LIMIT 50`,
-          [equip.id, inicio, fim]
+          [equip.id, inicio, fim, equip.temp_max, equip.temp_min]
         ).then(r => r.rows),
       ]);
 
