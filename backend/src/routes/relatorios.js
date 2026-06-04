@@ -66,7 +66,8 @@ function drawFooter(doc, pageNumber, reportId) {
 
 function drawSectionTitle(doc, title) {
   doc.moveDown(0.6);
-  doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2933').text(title);
+  doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2933')
+    .text(title, PAGE.left, doc.y);
   doc.moveDown(0.35);
 }
 
@@ -295,6 +296,7 @@ async function buscarLeiturasAgregadas(equipamentoId, inicio, fim, granularidade
      FROM leituras l
      WHERE l.equipamento_id = $1
        AND l.registrado_em BETWEEN $2 AND $3
+       AND l.temperatura <> -127
      GROUP BY 1
      ORDER BY 1`,
     [equipamentoId, inicio, fim]
@@ -355,6 +357,7 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
        FROM equipamentos e
        LEFT JOIN leituras l ON l.equipamento_id = e.id
          AND l.registrado_em BETWEEN $2 AND $3
+         AND l.temperatura <> -127
        WHERE ${equipFilter}
        GROUP BY e.id, e.nome, e.tipo, e.localizacao, e.fabricante, e.modelo, e.temp_min, e.temp_max
        ORDER BY e.nome`,
@@ -493,12 +496,12 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
     drawSectionTitle(doc, 'Resumo por equipamento');
     const cols = [
       { label: 'Equipamento',  x: PAGE.left,       width: 116 },
-      { label: 'Localização',  x: PAGE.left + 116,  width: 100 },
-      { label: 'Faixa (°C)',   x: PAGE.left + 216,  width: 72 },
-      { label: 'Média',        x: PAGE.left + 288,  width: 54, align: 'right' },
-      { label: 'Mín / Máx',   x: PAGE.left + 342,  width: 72, align: 'right' },
-      { label: 'Alertas',      x: PAGE.left + 414,  width: 44, align: 'right' },
-      { label: 'Conf.',        x: PAGE.left + 458,  width: 87, align: 'right' },
+      { label: 'Localização',  x: PAGE.left + 116,  width: 85 },
+      { label: 'Faixa (°C)',   x: PAGE.left + 201,  width: 68 },
+      { label: 'Média',        x: PAGE.left + 269,  width: 50, align: 'right' },
+      { label: 'Mín / Máx',   x: PAGE.left + 319,  width: 70, align: 'right' },
+      { label: 'Alertas',      x: PAGE.left + 389,  width: 42, align: 'right' },
+      { label: 'Conf.',        x: PAGE.left + 431,  width: 64, align: 'right' },
     ];
 
     drawTableHeader(doc, cols);
