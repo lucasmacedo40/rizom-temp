@@ -71,11 +71,54 @@ function drawSectionTitle(doc, title) {
 }
 
 function drawKpi(doc, x, y, width, label, value, color) {
-  doc.save();
-  doc.roundedRect(x, y, width, 58, 6).fillAndStroke('#f8fafc', '#d8dee6');
-  doc.fillColor('#667085').fontSize(8).font('Helvetica').text(label, x + 10, y + 9, { width: width - 20 });
-  doc.fillColor(color || '#1a6eff').fontSize(15).font('Helvetica-Bold').text(value, x + 10, y + 27, { width: width - 20 });
-  doc.restore();
+  // Left border
+  doc.rect(x, y, 3, 54).fillColor(color).fill();
+  // Background
+  doc.rect(x + 3, y, width - 3, 54).fillColor('#f8fafc').fill();
+  // Label
+  doc.fillColor('#64748b').fontSize(8).font('Helvetica')
+    .text(label, x + 10, y + 8, { width: width - 16 });
+  // Value
+  doc.fillColor(color).fontSize(20).font('Helvetica-Bold')
+    .text(value, x + 10, y + 24, { width: width - 16 });
+}
+
+function drawBarChart(doc, equipamentos, addPage) {
+  const LABEL_W = 140;
+  const VALUE_W = 48;
+  const BAR_LEFT  = PAGE.left + LABEL_W + 8;
+  const BAR_RIGHT = PAGE.right - VALUE_W - 4;
+  const BAR_W     = BAR_RIGHT - BAR_LEFT;
+  const ROW_H     = 20;
+
+  equipamentos.forEach((equip) => {
+    ensureSpace(doc, ROW_H + 4, addPage);
+    const conf    = calcularConformidade(equip);
+    const confPct = conf === null ? 0 : conf;
+    const color   = confPct >= 95 ? '#15803d' : confPct >= 80 ? '#d97706' : '#b42318';
+    const y       = doc.y;
+
+    // Equipment name label
+    doc.fillColor('#374151').fontSize(8.5).font('Helvetica')
+      .text(equip.nome, PAGE.left, y + 5, { width: LABEL_W - 4, lineBreak: false });
+
+    // Track background
+    doc.rect(BAR_LEFT, y + 6, BAR_W, 8).fillColor('#e5e7eb').fill();
+
+    // Bar fill (never render 0-width rect)
+    const fillW = (confPct / 100) * BAR_W;
+    if (fillW > 0) {
+      doc.rect(BAR_LEFT, y + 6, fillW, 8).fillColor(color).fill();
+    }
+
+    // Percentage label
+    const label = conf === null ? 'N/A' : `${formatarNumero(conf)}%`;
+    doc.fillColor(color).fontSize(8.5).font('Helvetica-Bold')
+      .text(label, BAR_RIGHT + 6, y + 5, { width: VALUE_W, align: 'right' });
+
+    doc.y = y + ROW_H;
+  });
+  doc.y += 6;
 }
 
 function drawTableHeader(doc, columns) {
