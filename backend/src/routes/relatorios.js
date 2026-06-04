@@ -55,7 +55,7 @@ function drawFooter(doc, pageNumber, reportId) {
   doc.save();
   doc.fontSize(8).fillColor('#7f8c8d');
   doc.text(
-    `Documento gerado automaticamente pelo sistema Rizom Temp | ID ${reportId}`,
+    `Sistema Rizom Temp · ID ${reportId}`,
     PAGE.left,
     y,
     { width: 360 }
@@ -307,27 +307,224 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
   try {
     const { equipamento_id } = req.query;
     const granularidade = req.query.granularidade || '3h';
-    // backward compat: accept both ?periodo= (new) and ?mes= (old)
-    const periodoParam = req.query.periodo || req.query.mes;
-    const reportId = crypto.randomUUID();
+    const periodoParam  = req.query.periodo || req.query.mes;
+    const reportId      = crypto.randomUUID();
 
+    // ── Date range ──────────────────────────────────────────────────────────
     let inicio, fim, nomePeriodo;
     if (periodoParam === 'semana') {
-      fim   = new Date();
-      inicio = new Date(fim.getTime() - 7 * 24 * 60 * 60 * 1000);
+      fim        = new Date();
+      inicio     = new Date(fim.getTime() - 7 * 24 * 60 * 60 * 1000);
       nomePeriodo = 'Últimos 7 dias';
     } else {
       const refDate = periodoParam ? parseISO(`${periodoParam}-01`) : new Date();
       if (periodoParam && isNaN(refDate.getTime())) {
         return res.status(400).json({ erro: 'Parâmetro "periodo" inválido. Use YYYY-MM ou "semana".' });
       }
-      inicio      = startOfMonth(refDate);
-      fim         = endOfMonth(refDate);
-      nomePeriodo = format(refDate, 'MMMM yyyy', { locale: ptBR });
+      inicio        = startOfMonth(refDate);
+      fim           = endOfMonth(refDate);
+      nomePeriodo   = format(refDate, 'MMMM yyyy', { locale: ptBR });
     }
 
-    // ... (rest of handler comes in Task 5 and 6)
-    res.json({ ok: true, inicio, fim, nomePeriodo, granularidade }); // temporary
+    // ── Client info ─────────────────────────────────────────────────────────
+    const { rows: clienteRows } = await db.query(
+      `SELECT nome, cnpj, email FROM clientes WHERE id = $1`,
+      [req.usuario.cliente_id]
+    );
+    const cliente = clienteRows[0];
+
+    // ── Equipment summary stats ──────────────────────────────────────────────
+    let equipFilter = `e.cliente_id = $1`;
+    const equipParams = [req.usuario.cliente_id, inicio, fim];
+    if (equipamento_id) {
+      equipFilter += ` AND e.id = $4`;
+      equipParams.push(equipamento_id);
+    }
+
+    const { rows: equipamentos } = await db.query(
+      `SELECT e.id, e.nome, e.tipo, e.localizacao, e.fabricante, e.modelo,
+              e.temp_min, e.temp_max,
+              COUNT(l.id)                                        AS total_leituras,
+              COUNT(l.id) FILTER (WHERE NOT l.dentro_limite)    AS leituras_alerta,
+              ROUND(AVG(l.temperatura)::numeric, 2)             AS media,
+              MIN(l.temperatura)                                AS minima,
+              MAX(l.temperatura)                                AS maxima
+       FROM equipamentos e
+       LEFT JOIN leituras l ON l.equipamento_id = e.id
+         AND l.registrado_em BETWEEN $2 AND $3
+       WHERE ${equipFilter}
+       GROUP BY e.id, e.nome, e.tipo, e.localizacao, e.fabricante, e.modelo, e.temp_min, e.temp_max
+       ORDER BY e.nome`,
+      equipParams
+    );
+
+    if (equipamento_id && equipamentos.length === 0) {
+      return res.status(404).json({ erro: 'Equipamento não encontrado' });
+    }
+
+    // ── PDF setup ────────────────────────────────────────────────────────────
+    const periodoLabel = periodoParam === 'semana'
+      ? `semana`
+      : (periodoParam || format(new Date(), 'yyyy-MM'));
+    const filenameParts = ['rizom-temp', periodoLabel, granularidade];
+    if (equipamento_id && equipamentos.length) {
+      filenameParts.push(slugify(equipamentos[0].nome));
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filenameParts.filter(Boolean).join('-')}.pdf"`
+    );
+
+    // Fire-and-forget audit record
+    db.query(
+      `INSERT INTO relatorios (id, cliente_id, tipo, periodo_inicio, periodo_fim, gerado_por)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [reportId, req.usuario.cliente_id, 'mensal', inicio, fim, req.usuario.id]
+    ).catch(err => console.error('[Relatorios] Erro ao registrar auditoria:', err.message));
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    doc.pipe(res);
+
+    // ── Totals for Page 1 KPIs ───────────────────────────────────────────────
+    const totalLeituras      = equipamentos.reduce((s, e) => s + Number(e.total_leituras || 0), 0);
+    const totalAlerta        = equipamentos.reduce((s, e) => s + Number(e.leituras_alerta || 0), 0);
+    const semDados           = equipamentos.filter(e => Number(e.total_leituras || 0) === 0).length;
+    const conformidadeGeral  = totalLeituras > 0
+      ? ((totalLeituras - totalAlerta) / totalLeituras) * 100
+      : null;
+    const statusGeral  = conformidadeGeral === null
+      ? 'Sem dados'
+      : conformidadeGeral >= 95 && semDados === 0 ? 'Conforme' : 'Atenção';
+    const statusColor  = statusGeral === 'Conforme' ? '#15803d' : '#b42318';
+
+    let pageNumber = 1;
+    const addPage = () => {
+      drawFooter(doc, pageNumber, reportId);
+      doc.addPage();
+      pageNumber++;
+    };
+
+    // ── PAGE 1: Header ───────────────────────────────────────────────────────
+    // White header with 3px dark-blue bottom border
+    doc.rect(0, 0, 595, 68).fillColor('#ffffff').fill();
+    doc.rect(0, 65, 595, 3).fillColor('#102a43').fill();
+
+    // RT logo square
+    doc.roundedRect(PAGE.left, 18, 30, 30, 4).fillColor('#102a43').fill();
+    doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold')
+      .text('RT', PAGE.left, 27, { width: 30, align: 'center' });
+
+    // Title + subtitle
+    doc.fillColor('#102a43').fontSize(14).font('Helvetica-Bold')
+      .text('Rizom Temp', PAGE.left + 38, 20);
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+      .text('Relatório de Controle de Temperatura', PAGE.left + 38, 36);
+
+    // Period + badge (right side)
+    doc.fillColor('#102a43').fontSize(10).font('Helvetica-Bold')
+      .text(nomePeriodo, 0, 20, { width: PAGE.right, align: 'right' });
+    doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+      .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, 0, 34, { width: PAGE.right, align: 'right' });
+    doc.roundedRect(PAGE.right - 72, 44, 72, 18, 4).fillColor(statusColor).fill();
+    doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+      .text(statusGeral, PAGE.right - 72, 49, { width: 72, align: 'center' });
+
+    // ── PAGE 1: Doc info (2 columns) ─────────────────────────────────────────
+    doc.y = 82;
+    const midX = PAGE.left + (PAGE.right - PAGE.left) / 2 + 20;
+
+    // Left column: Client + CNPJ
+    doc.fillColor('#475467').fontSize(9).font('Helvetica');
+    doc.text('Cliente: ', PAGE.left, doc.y, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('#102a43').text(cliente.nome);
+    if (cliente.cnpj) {
+      doc.font('Helvetica').fillColor('#475467').text('CNPJ: ', PAGE.left, doc.y, { continued: true });
+      doc.font('Helvetica-Bold').fillColor('#102a43').text(cliente.cnpj);
+    }
+
+    // Right column: Period + ID (painted over same rows)
+    const docInfoTop = 82;
+    doc.fillColor('#475467').fontSize(9).font('Helvetica')
+      .text('Período: ', midX, docInfoTop, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('#102a43')
+      .text(`${format(inicio, 'dd/MM/yyyy')} – ${format(fim, 'dd/MM/yyyy')}`);
+    doc.font('Helvetica').fillColor('#475467')
+      .text('ID: ', midX, docInfoTop + 14, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('#102a43')
+      .text(reportId.substring(0, 18) + '…');
+
+    // Separator
+    doc.y = Math.max(doc.y, docInfoTop + 28) + 4;
+    doc.moveTo(PAGE.left, doc.y).lineTo(PAGE.right, doc.y)
+      .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
+    doc.y += 12;
+
+    // ── PAGE 1: KPIs ──────────────────────────────────────────────────────────
+    const kpiY = doc.y;
+    const kpiW = 116;
+    const kpiColor = conformidadeGeral === null ? '#64748b'
+      : conformidadeGeral >= 95 ? '#15803d'
+      : conformidadeGeral >= 80 ? '#d97706' : '#b42318';
+
+    drawKpi(doc, PAGE.left,        kpiY, kpiW,
+      'Conformidade geral',
+      conformidadeGeral === null ? 'N/A' : `${formatarNumero(conformidadeGeral)}%`,
+      kpiColor);
+    drawKpi(doc, PAGE.left + 126,  kpiY, kpiW,
+      'Equipamentos', String(equipamentos.length), '#102a43');
+    drawKpi(doc, PAGE.left + 252,  kpiY, kpiW,
+      'Total de leituras', totalLeituras.toLocaleString('pt-BR'), '#6366f1');
+    drawKpi(doc, PAGE.left + 378,  kpiY, kpiW,
+      'Fora da faixa', String(totalAlerta),
+      totalAlerta > 0 ? '#b42318' : '#15803d');
+
+    doc.y = kpiY + 72;
+
+    // ── PAGE 1: Bar chart ─────────────────────────────────────────────────────
+    drawSectionTitle(doc, 'Conformidade por equipamento');
+    drawBarChart(doc, equipamentos, addPage);
+
+    // ── PAGE 1: Summary table ─────────────────────────────────────────────────
+    drawSectionTitle(doc, 'Resumo por equipamento');
+    const cols = [
+      { label: 'Equipamento',  x: PAGE.left,       width: 116 },
+      { label: 'Localização',  x: PAGE.left + 116,  width: 100 },
+      { label: 'Faixa (°C)',   x: PAGE.left + 216,  width: 72 },
+      { label: 'Média',        x: PAGE.left + 288,  width: 54, align: 'right' },
+      { label: 'Mín / Máx',   x: PAGE.left + 342,  width: 72, align: 'right' },
+      { label: 'Alertas',      x: PAGE.left + 414,  width: 44, align: 'right' },
+      { label: 'Conf.',        x: PAGE.left + 458,  width: 87, align: 'right' },
+    ];
+
+    drawTableHeader(doc, cols);
+    equipamentos.forEach((equip, idx) => {
+      ensureSpace(doc, 34, () => { addPage(); drawTableHeader(doc, cols); });
+      const conf = calcularConformidade(equip);
+      drawTableRow(doc, cols, [
+        `${equip.nome}\n${formatarTipo(equip.tipo)}`,
+        equip.localizacao || '—',
+        `${formatarNumero(equip.temp_min)} a ${formatarNumero(equip.temp_max)}`,
+        equip.total_leituras > 0 ? `${formatarNumero(equip.media)}°C` : '—',
+        equip.total_leituras > 0
+          ? `${formatarNumero(equip.minima, 1)} / ${formatarNumero(equip.maxima, 1)}°C`
+          : '—',
+        String(equip.leituras_alerta || 0),
+        conf === null ? 'N/A' : `${formatarNumero(conf)}%`,
+      ], idx);
+    });
+
+    // ── PAGE 1: ANVISA note ───────────────────────────────────────────────────
+    ensureSpace(doc, 40, addPage);
+    doc.moveDown(1.2);
+    doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8')
+      .text(
+        'Referência: ANVISA RDC 216/2004 — Boas Práticas para Serviços de Alimentação. ' +
+        'Este documento consolida indicadores do período e não substitui anexos técnicos ' +
+        'ou registros operacionais quando solicitados.',
+        PAGE.left, doc.y, { width: PAGE.right - PAGE.left, align: 'center' }
+      );
   } catch (err) {
     console.error('[Relatorios] Erro ao gerar relatório:', err);
     res.status(500).json({ erro: 'Erro interno do servidor' });
