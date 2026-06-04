@@ -124,9 +124,9 @@ export const alertasApi = {
 
 export const relatoriosApi = {
   resumo: () => api.get<Resumo>('/relatorios/resumo'),
-  mensal: (mes: string, equipamento_id?: string) =>
+  mensal: (periodo: string, equipamento_id?: string, granularidade = '3h') =>
     api.get('/relatorios/mensal', {
-      params: { mes, equipamento_id },
+      params: { periodo, equipamento_id, granularidade },
       responseType: 'blob',
     }),
 };
