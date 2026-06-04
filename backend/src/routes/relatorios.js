@@ -528,6 +528,103 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
         'ou registros operacionais quando solicitados.',
         PAGE.left, doc.y, { width: PAGE.right - PAGE.left, align: 'center' }
       );
+
+    // ── PAGES 2–N: One page per equipment ────────────────────────────────────
+    for (const equip of equipamentos) {
+      // Fetch aggregated readings and alerts for this equipment
+      const [pontos, alertasEquip] = await Promise.all([
+        buscarLeiturasAgregadas(equip.id, inicio, fim, granularidade),
+        db.query(
+          `SELECT a.tipo, a.temperatura, a.mensagem, a.criado_em
+           FROM alertas a
+           WHERE a.equipamento_id = $1
+             AND a.criado_em BETWEEN $2 AND $3
+           ORDER BY a.criado_em DESC
+           LIMIT 50`,
+          [equip.id, inicio, fim]
+        ).then(r => r.rows),
+      ]);
+
+      addPage();
+
+      // Equipment header bar
+      doc.rect(0, doc.y, 595, 52).fillColor('#102a43').fill();
+      doc.fillColor('#ffffff').fontSize(15).font('Helvetica-Bold')
+        .text(equip.nome, PAGE.left, doc.y + 10);
+      const metaParts = [
+        formatarTipo(equip.tipo),
+        equip.localizacao || null,
+        `Faixa: ${formatarNumero(equip.temp_min, 0)}°C a ${formatarNumero(equip.temp_max, 0)}°C`,
+        equip.fabricante && equip.modelo ? `${equip.fabricante} ${equip.modelo}` : null,
+      ].filter(Boolean);
+      doc.fillColor('#9db4d4').fontSize(9).font('Helvetica')
+        .text(metaParts.join('  ·  '), PAGE.left, doc.y + 28, { width: PAGE.right - PAGE.left });
+      doc.y = doc.y + 52 + 8; // manual advance past header rect
+
+      // Equipment KPIs
+      const eKpiY  = doc.y;
+      const eKpiW  = 116;
+      const eConf  = calcularConformidade(equip);
+      const eColor = eConf === null ? '#64748b'
+        : eConf >= 95 ? '#15803d'
+        : eConf >= 80 ? '#d97706' : '#b42318';
+
+      drawKpi(doc, PAGE.left,       eKpiY, eKpiW,
+        'Conformidade', eConf === null ? 'N/A' : `${formatarNumero(eConf)}%`, eColor);
+      drawKpi(doc, PAGE.left + 126, eKpiY, eKpiW,
+        'Temperatura média',
+        equip.total_leituras > 0 ? `${formatarNumero(equip.media)}°C` : '—',
+        '#102a43');
+      drawKpi(doc, PAGE.left + 252, eKpiY, eKpiW,
+        'Mínima registrada',
+        equip.total_leituras > 0 ? `${formatarNumero(equip.minima)}°C` : '—',
+        '#3b82f6');
+      drawKpi(doc, PAGE.left + 378, eKpiY, eKpiW,
+        'Máxima registrada',
+        equip.total_leituras > 0 ? `${formatarNumero(equip.maxima)}°C` : '—',
+        '#ef4444');
+      doc.y = eKpiY + 72;
+
+      // Line chart
+      drawSectionTitle(doc, `Temperatura registrada no período (granularidade: ${granularidade})`);
+      drawLineChart(doc, pontos, equip.temp_min, equip.temp_max);
+
+      // Alerts table
+      ensureSpace(doc, 60, addPage);
+      drawSectionTitle(doc, 'Alertas no período');
+
+      if (alertasEquip.length === 0) {
+        doc.fontSize(8.5).font('Helvetica').fillColor('#94a3b8')
+          .text('Nenhum alerta registrado no período selecionado.');
+        doc.moveDown(0.5);
+      } else {
+        const alertCols = [
+          { label: 'Data / Hora',  x: PAGE.left,       width: 80 },
+          { label: 'Tipo',         x: PAGE.left + 80,   width: 90 },
+          { label: 'Temperatura',  x: PAGE.left + 170,  width: 72, align: 'right' },
+          { label: 'Mensagem',     x: PAGE.left + 242,  width: 303 },
+        ];
+        drawTableHeader(doc, alertCols);
+        alertasEquip.forEach((al, idx) => {
+          ensureSpace(doc, 28, () => { addPage(); drawTableHeader(doc, alertCols); });
+          drawTableRow(doc, alertCols, [
+            format(new Date(al.criado_em), 'dd/MM/yyyy HH:mm'),
+            formatarTipo(al.tipo),
+            al.temperatura != null ? `${formatarNumero(al.temperatura)}°C` : '—',
+            al.mensagem || '—',
+          ], idx);
+        });
+        if (alertasEquip.length === 50) {
+          doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8')
+            .text('Mostrando os 50 alertas mais recentes do período.');
+          doc.moveDown(0.3);
+        }
+      }
+    }
+
+    // ── Close document ────────────────────────────────────────────────────────
+    drawFooter(doc, pageNumber, reportId);
+    doc.end();
   } catch (err) {
     console.error('[Relatorios] Erro ao gerar relatório:', err);
     res.status(500).json({ erro: 'Erro interno do servidor' });
