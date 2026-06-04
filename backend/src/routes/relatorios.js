@@ -651,6 +651,7 @@ router.get('/resumo', autenticar, async (req, res) => {
          ) AS alertas_24h
        FROM leituras l
        JOIN equipamentos_cliente e ON e.id = l.equipamento_id
+       WHERE l.temperatura <> -127
      ),
      alertas_resumo AS (
        SELECT COUNT(*) FILTER (WHERE NOT reconhecido) AS alertas_nao_reconhecidos

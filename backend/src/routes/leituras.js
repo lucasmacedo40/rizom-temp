@@ -27,7 +27,7 @@ router.get('/', autenticar, async (req, res) => {
   }
 
   const params = [req.usuario.cliente_id];
-  let where = `e.cliente_id = $1`;
+  let where = `e.cliente_id = $1 AND l.temperatura <> -127`;
   let idx = 2;
 
   if (equipamento_id) {
@@ -90,6 +90,7 @@ router.get('/grafico', autenticar, async (req, res) => {
      FROM leituras
      WHERE equipamento_id = $1
        AND registrado_em >= NOW() - ($2::int * INTERVAL '1 hour')
+       AND temperatura <> -127
      GROUP BY minuto
      ORDER BY minuto ASC`,
     [equipamento_id, parseInt(horas)]

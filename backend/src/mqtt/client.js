@@ -147,7 +147,10 @@ async function registrarLeiturasCanais(equipBase, canais) {
 function normalizarTemperatura(valor) {
   if (valor === undefined || valor === null || valor === '') return null;
   const numero = Number(valor);
-  return Number.isFinite(numero) ? numero : null;
+  if (!Number.isFinite(numero)) return null;
+  // DS18B20 retorna -127 quando há falha de comunicação ou sensor desconectado
+  if (numero === -127) return null;
+  return numero;
 }
 
 async function buscarEquipamentoPorDeviceId(deviceId) {
