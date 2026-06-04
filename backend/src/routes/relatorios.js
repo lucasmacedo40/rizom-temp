@@ -71,6 +71,7 @@ function drawSectionTitle(doc, title) {
 }
 
 function drawKpi(doc, x, y, width, label, value, color) {
+  doc.save();
   // Left border
   doc.rect(x, y, 3, 54).fillColor(color).fill();
   // Background
@@ -81,6 +82,7 @@ function drawKpi(doc, x, y, width, label, value, color) {
   // Value
   doc.fillColor(color).fontSize(20).font('Helvetica-Bold')
     .text(value, x + 10, y + 24, { width: width - 16 });
+  doc.restore();
 }
 
 function drawBarChart(doc, equipamentos, addPage) {
