@@ -108,6 +108,39 @@ function drawTableRow(doc, columns, values, rowIndex) {
   doc.y = startY + rowHeight;
 }
 
+async function buscarLeiturasAgregadas(equipamentoId, inicio, fim, granularidade) {
+  let bucketExpr;
+  switch (granularidade) {
+    case '1h':
+      bucketExpr = `DATE_TRUNC('hour', l.registrado_em AT TIME ZONE 'America/Recife')`;
+      break;
+    case '3h':
+      bucketExpr = `DATE_TRUNC('hour', l.registrado_em AT TIME ZONE 'America/Recife')
+        - ((EXTRACT(HOUR FROM l.registrado_em AT TIME ZONE 'America/Recife')::int % 3) * INTERVAL '1 hour')`;
+      break;
+    case 'diaria':
+      bucketExpr = `DATE_TRUNC('day', l.registrado_em AT TIME ZONE 'America/Recife')`;
+      break;
+    default: // raw — group by native 5-min sensor interval to avoid 8640 individual points
+      bucketExpr = `DATE_TRUNC('minute', l.registrado_em AT TIME ZONE 'America/Recife')
+        - ((EXTRACT(MINUTE FROM l.registrado_em AT TIME ZONE 'America/Recife')::int % 5) * INTERVAL '1 minute')`;
+  }
+
+  const { rows } = await db.query(
+    `SELECT
+       (${bucketExpr}) AS ts,
+       ROUND(AVG(l.temperatura)::numeric, 2) AS avg_temp,
+       bool_or(NOT l.dentro_limite)           AS tem_violacao
+     FROM leituras l
+     WHERE l.equipamento_id = $1
+       AND l.registrado_em BETWEEN $2 AND $3
+     GROUP BY 1
+     ORDER BY 1`,
+    [equipamentoId, inicio, fim]
+  );
+  return rows;
+}
+
 // GET /relatorios/mensal?periodo=YYYY-MM|semana&equipamento_id=&granularidade=raw|1h|3h|diaria
 router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
   try {
