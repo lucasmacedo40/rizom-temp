@@ -3,6 +3,7 @@
 // RDC 216/2004 exige registro e manutenção de controle de temperatura
 
 const express = require('express');
+const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const { format, startOfMonth, endOfMonth, parseISO } = require('date-fns');
 const { ptBR } = require('date-fns/locale');
@@ -12,142 +13,128 @@ const { exigirBillingAtivo } = require('../middleware/billing');
 
 const router = express.Router();
 
-// GET /relatorios/mensal?mes=2024-12&equipamento_id= (opcional)
+const PAGE = {
+  left: 50,
+  right: 545,
+  top: 50,
+  bottom: 735,
+  footerY: 760,
+};
+
+function formatarNumero(valor, casas = 1) {
+  if (valor === null || valor === undefined || valor === 'N/A') return 'N/A';
+  return Number(valor).toFixed(casas).replace('.', ',');
+}
+
+function formatarTipo(tipo) {
+  return tipo ? tipo.replace(/_/g, ' ') : '-';
+}
+
+function slugify(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+
+function calcularConformidade(equip) {
+  const total = Number(equip.total_leituras || 0);
+  if (total === 0) return null;
+  const alertas = Number(equip.leituras_alerta || 0);
+  return ((total - alertas) / total) * 100;
+}
+
+function ensureSpace(doc, needed, addPage) {
+  if (doc.y + needed > PAGE.bottom) addPage();
+}
+
+function drawFooter(doc, pageNumber, reportId) {
+  const y = PAGE.footerY;
+  doc.save();
+  doc.fontSize(8).fillColor('#7f8c8d');
+  doc.text(
+    `Documento gerado automaticamente pelo sistema Rizom Temp | ID ${reportId}`,
+    PAGE.left,
+    y,
+    { width: 360 }
+  );
+  doc.text(`Página ${pageNumber}`, 420, y, { width: 125, align: 'right' });
+  doc.restore();
+}
+
+function drawSectionTitle(doc, title) {
+  doc.moveDown(0.6);
+  doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2933').text(title);
+  doc.moveDown(0.35);
+}
+
+function drawKpi(doc, x, y, width, label, value, color) {
+  doc.save();
+  doc.roundedRect(x, y, width, 58, 6).fillAndStroke('#f8fafc', '#d8dee6');
+  doc.fillColor('#667085').fontSize(8).font('Helvetica').text(label, x + 10, y + 9, { width: width - 20 });
+  doc.fillColor(color || '#1a6eff').fontSize(15).font('Helvetica-Bold').text(value, x + 10, y + 27, { width: width - 20 });
+  doc.restore();
+}
+
+function drawTableHeader(doc, columns) {
+  const startY = doc.y;
+  doc.save();
+  doc.rect(PAGE.left, startY, PAGE.right - PAGE.left, 22).fill('#eef3f8');
+  doc.fillColor('#344054').fontSize(8).font('Helvetica-Bold');
+  for (const col of columns) {
+    doc.text(col.label, col.x + 4, startY + 7, { width: col.width - 8, align: col.align || 'left' });
+  }
+  doc.restore();
+  doc.y = startY + 22;
+}
+
+function drawTableRow(doc, columns, values, rowIndex) {
+  const startY = doc.y;
+  const rowHeight = 30;
+  doc.save();
+  doc.rect(PAGE.left, startY, PAGE.right - PAGE.left, rowHeight).fill(rowIndex % 2 === 0 ? '#ffffff' : '#fbfcfe');
+  doc.strokeColor('#e5e7eb').moveTo(PAGE.left, startY + rowHeight).lineTo(PAGE.right, startY + rowHeight).stroke();
+  doc.fillColor('#1f2933').fontSize(8).font('Helvetica');
+  columns.forEach((col, index) => {
+    doc.text(values[index], col.x + 4, startY + 8, {
+      width: col.width - 8,
+      align: col.align || 'left',
+      lineGap: 1,
+    });
+  });
+  doc.restore();
+  doc.y = startY + rowHeight;
+}
+
+// GET /relatorios/mensal?periodo=YYYY-MM|semana&equipamento_id=&granularidade=raw|1h|3h|diaria
 router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
-  const { mes, equipamento_id } = req.query;
+  try {
+    const { equipamento_id } = req.query;
+    const granularidade = req.query.granularidade || '3h';
+    // backward compat: accept both ?periodo= (new) and ?mes= (old)
+    const periodoParam = req.query.periodo || req.query.mes;
+    const reportId = crypto.randomUUID();
 
-  // Determina período
-  const refDate = mes ? parseISO(`${mes}-01`) : new Date();
-  const inicio = startOfMonth(refDate);
-  const fim = endOfMonth(refDate);
-
-  // Busca dados do cliente
-  const { rows: clienteRows } = await db.query(
-    `SELECT nome, cnpj, email FROM clientes WHERE id = $1`,
-    [req.usuario.cliente_id]
-  );
-  const cliente = clienteRows[0];
-
-  // Busca equipamentos
-  let equipFilter = `e.cliente_id = $1`;
-  const params = [req.usuario.cliente_id, inicio, fim];
-  if (equipamento_id) {
-    equipFilter += ` AND e.id = $4`;
-    params.push(equipamento_id);
-  }
-
-  const { rows: equipamentos } = await db.query(
-    `SELECT e.id, e.nome, e.tipo, e.localizacao, e.temp_min, e.temp_max,
-            COUNT(l.id) AS total_leituras,
-            COUNT(l.id) FILTER (WHERE NOT l.dentro_limite) AS leituras_alerta,
-            ROUND(AVG(l.temperatura)::numeric, 2) AS media,
-            MIN(l.temperatura) AS minima,
-            MAX(l.temperatura) AS maxima
-     FROM equipamentos e
-     LEFT JOIN leituras l ON l.equipamento_id = e.id
-       AND l.registrado_em BETWEEN $2 AND $3
-     WHERE ${equipFilter}
-     GROUP BY e.id, e.nome, e.tipo, e.localizacao, e.temp_min, e.temp_max
-     ORDER BY e.nome`,
-    params
-  );
-
-  // Configura resposta PDF
-  const nomePeriodo = format(refDate, 'MMMM yyyy', { locale: ptBR });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="rizom-temp-${mes || format(new Date(), 'yyyy-MM')}.pdf"`
-  );
-
-  // Fire-and-forget audit record
-  db.query(
-    `INSERT INTO relatorios (cliente_id, tipo, periodo_inicio, periodo_fim, gerado_por)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [req.usuario.cliente_id, 'mensal', inicio, fim, req.usuario.id]
-  ).catch(err => console.error('[Relatorios] Erro ao registrar auditoria:', err.message));
-
-  const doc = new PDFDocument({ margin: 50, size: 'A4' });
-  doc.pipe(res);
-
-  // ── Cabeçalho ─────────────────────────────────────────────────────────────
-  doc.fontSize(18).font('Helvetica-Bold').text('RIZOM TEMP', { align: 'center' });
-  doc.fontSize(12).font('Helvetica').text(
-    'Relatório de Controle de Temperatura — ANVISA RDC 216/2004',
-    { align: 'center' }
-  );
-  doc.moveDown(0.5);
-
-  doc.fontSize(10).text(`Cliente: ${cliente.nome}`, { align: 'left' });
-  if (cliente.cnpj) doc.text(`CNPJ: ${cliente.cnpj}`);
-  doc.text(`Período: ${nomePeriodo}`);
-  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`);
-
-  doc.moveDown();
-  doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-  doc.moveDown(0.5);
-
-  // ── Resumo por equipamento ─────────────────────────────────────────────────
-  for (const equip of equipamentos) {
-    const conformidade = equip.total_leituras > 0
-      ? (((equip.total_leituras - equip.leituras_alerta) / equip.total_leituras) * 100).toFixed(1)
-      : 'N/A';
-
-    doc.fontSize(11).font('Helvetica-Bold').text(equip.nome);
-    doc.fontSize(9).font('Helvetica');
-    doc.text(`Tipo: ${equip.tipo.replace('_', ' ')}  |  Localização: ${equip.localizacao || '—'}`);
-    doc.text(`Faixa permitida: ${equip.temp_min}°C a ${equip.temp_max}°C`);
-    doc.text(`Total de leituras: ${equip.total_leituras}  |  Leituras fora do limite: ${equip.leituras_alerta}`);
-
-    if (equip.total_leituras > 0) {
-      doc.text(`Média: ${equip.media}°C  |  Mínima: ${equip.minima}°C  |  Máxima: ${equip.maxima}°C`);
+    let inicio, fim, nomePeriodo;
+    if (periodoParam === 'semana') {
+      fim   = new Date();
+      inicio = new Date(fim.getTime() - 7 * 24 * 60 * 60 * 1000);
+      nomePeriodo = 'Últimos 7 dias';
+    } else {
+      const refDate = periodoParam ? parseISO(`${periodoParam}-01`) : new Date();
+      inicio      = startOfMonth(refDate);
+      fim         = endOfMonth(refDate);
+      nomePeriodo = format(refDate, 'MMMM yyyy', { locale: ptBR });
     }
 
-    const conformColor = parseFloat(conformidade) >= 95 ? '#27ae60' : '#e74c3c';
-    doc.fontSize(10).font('Helvetica-Bold')
-      .fillColor(conformColor)
-      .text(`Conformidade: ${conformidade}%`)
-      .fillColor('black');
-
-    doc.moveDown(0.8);
+    // ... (rest of handler comes in Task 5 and 6)
+    res.json({ ok: true, inicio, fim, nomePeriodo, granularidade }); // temporary
+  } catch (err) {
+    console.error('[Relatorios] Erro ao gerar relatório:', err);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
   }
-
-  // ── Alertas do período ─────────────────────────────────────────────────────
-  const { rows: alertas } = await db.query(
-    `SELECT a.tipo, a.temperatura, a.mensagem, a.criado_em, e.nome AS equip_nome
-     FROM alertas a
-     JOIN equipamentos e ON e.id = a.equipamento_id
-     WHERE a.cliente_id = $1
-       AND a.criado_em BETWEEN $2 AND $3
-     ORDER BY a.criado_em DESC
-     LIMIT 100`,
-    [req.usuario.cliente_id, inicio, fim]
-  );
-
-  if (alertas.length > 0) {
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-    doc.moveDown(0.5);
-    doc.fontSize(11).font('Helvetica-Bold').text('Alertas gerados no período');
-    doc.moveDown(0.3);
-
-    for (const alerta of alertas) {
-      doc.fontSize(9).font('Helvetica')
-        .text(
-          `${format(new Date(alerta.criado_em), 'dd/MM HH:mm')}  |  ${alerta.equip_nome}  |  ${alerta.mensagem}`
-        );
-    }
-    doc.moveDown();
-  }
-
-  // ── Rodapé ────────────────────────────────────────────────────────────────
-  doc.fontSize(8).fillColor('#888888')
-    .text(
-      'Documento gerado automaticamente pelo sistema Rizom Temp. ' +
-      'Conforme ANVISA RDC 216/2004 — Boas Práticas para Serviços de Alimentação.',
-      50, 760, { align: 'center', width: 495 }
-    );
-
-  doc.end();
 });
 
 // GET /relatorios/resumo — dados JSON para dashboard
