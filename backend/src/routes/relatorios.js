@@ -332,6 +332,9 @@ router.get('/mensal', autenticar, exigirBillingAtivo, async (req, res) => {
       [req.usuario.cliente_id]
     );
     const cliente = clienteRows[0];
+    if (!cliente) {
+      return res.status(404).json({ erro: 'Cliente não encontrado' });
+    }
 
     // ── Equipment summary stats ──────────────────────────────────────────────
     let equipFilter = `e.cliente_id = $1`;
