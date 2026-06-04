@@ -123,6 +123,122 @@ function drawBarChart(doc, equipamentos, addPage) {
   doc.y += 6;
 }
 
+function drawLineChart(doc, pontos, tempMin, tempMax) {
+  if (!pontos || pontos.length < 2) {
+    doc.moveDown(0.3);
+    doc.fontSize(8.5).fillColor('#94a3b8').font('Helvetica')
+      .text('Dados insuficientes para o período selecionado.');
+    doc.moveDown(0.5);
+    return;
+  }
+
+  const CHART_LEFT  = PAGE.left + 34; // room for Y-axis labels
+  const CHART_RIGHT = PAGE.right;
+  const CHART_W     = CHART_RIGHT - CHART_LEFT;
+  const CHART_H     = 130;
+  const TOP         = doc.y + 4;
+  const BOTTOM      = TOP + CHART_H;
+
+  // Y scale: 20% margin around configured limits
+  const margin = Math.max((tempMax - tempMin) * 0.2, 2);
+  const yMin   = Number(tempMin) - margin;
+  const yMax   = Number(tempMax) + margin;
+  const yRange = yMax - yMin;
+
+  const xAt = (i) => CHART_LEFT + (i / Math.max(pontos.length - 1, 1)) * CHART_W;
+  const yAt = (t) => BOTTOM - ((Number(t) - yMin) / yRange) * CHART_H;
+
+  // Background
+  doc.rect(CHART_LEFT, TOP, CHART_W, CHART_H).fillColor('#f8fafc').fill();
+
+  // Conformance zone (between configured limits)
+  const yMaxPx = yAt(tempMax);
+  const yMinPx = yAt(tempMin);
+  doc.save();
+  doc.opacity(0.25);
+  doc.rect(CHART_LEFT, yMaxPx, CHART_W, yMinPx - yMaxPx).fillColor('#f0fdf4').fill();
+  doc.restore();
+
+  // Horizontal grid lines
+  [0.25, 0.5, 0.75].forEach(pct => {
+    const y = TOP + pct * CHART_H;
+    doc.moveTo(CHART_LEFT, y).lineTo(CHART_RIGHT, y)
+      .strokeColor('#e5e7eb').lineWidth(0.4).stroke();
+  });
+
+  // Y-axis labels
+  doc.fontSize(6.5).font('Helvetica').fillColor('#94a3b8');
+  [yMin, Number(tempMin), Number(tempMax), yMax].forEach(t => {
+    const y = yAt(t);
+    if (y >= TOP - 4 && y <= BOTTOM + 4) {
+      doc.text(`${formatarNumero(t, 0)}°`, PAGE.left, y - 3.5, { width: 30, align: 'right' });
+    }
+  });
+
+  // Limit lines (dashed)
+  doc.save();
+  doc.moveTo(CHART_LEFT, yMaxPx).lineTo(CHART_RIGHT, yMaxPx)
+    .strokeColor('#ef4444').lineWidth(0.8).dash(4, { space: 3 }).stroke();
+  doc.moveTo(CHART_LEFT, yMinPx).lineTo(CHART_RIGHT, yMinPx)
+    .strokeColor('#3b82f6').lineWidth(0.8).dash(4, { space: 3 }).stroke();
+  doc.undash();
+  doc.restore();
+
+  // Temperature line
+  doc.save();
+  doc.moveTo(xAt(0), yAt(pontos[0].avg_temp));
+  for (let i = 1; i < pontos.length; i++) {
+    doc.lineTo(xAt(i), yAt(pontos[i].avg_temp));
+  }
+  doc.strokeColor('#102a43').lineWidth(1.5).lineJoin('round').lineCap('round').stroke();
+  doc.restore();
+
+  // Violation dots
+  pontos.forEach((p, i) => {
+    if (p.tem_violacao) {
+      doc.circle(xAt(i), yAt(p.avg_temp), 2.5).fillColor('#ef4444').fill();
+    }
+  });
+
+  // X-axis date labels (~7 evenly spaced)
+  const nLabels = Math.min(7, pontos.length);
+  const step    = Math.max(1, Math.floor(pontos.length / nLabels));
+  doc.fontSize(6.5).font('Helvetica').fillColor('#94a3b8');
+  for (let i = 0; i < pontos.length; i += step) {
+    const x = xAt(i);
+    const label = format(new Date(pontos[i].ts), 'dd/MM', { locale: ptBR });
+    doc.text(label, x - 12, BOTTOM + 4, { width: 24, align: 'center' });
+  }
+
+  // Legend
+  doc.y = BOTTOM + 18;
+  const ly = doc.y;
+  let lx   = PAGE.left;
+  const legendItems = [
+    { type: 'line', color: '#102a43', label: 'Temperatura' },
+    { type: 'dash', color: '#ef4444', label: `Máx (${formatarNumero(tempMax, 0)}°C)` },
+    { type: 'dash', color: '#3b82f6', label: `Mín (${formatarNumero(tempMin, 0)}°C)` },
+    { type: 'dot',  color: '#ef4444', label: 'Violação' },
+  ];
+  legendItems.forEach(item => {
+    if (item.type === 'dot') {
+      doc.circle(lx + 5, ly + 4, 3).fillColor(item.color).fill();
+    } else {
+      doc.save();
+      const line = doc.moveTo(lx, ly + 4).lineTo(lx + 14, ly + 4)
+        .strokeColor(item.color).lineWidth(item.type === 'line' ? 1.5 : 1);
+      if (item.type === 'dash') line.dash(3, { space: 2 });
+      line.stroke();
+      if (item.type === 'dash') doc.undash();
+      doc.restore();
+    }
+    doc.fillColor('#64748b').fontSize(7).font('Helvetica')
+      .text(item.label, lx + 18, ly + 1, { width: 95 });
+    lx += 112;
+  });
+  doc.y = ly + 14;
+}
+
 function drawTableHeader(doc, columns) {
   const startY = doc.y;
   doc.save();
