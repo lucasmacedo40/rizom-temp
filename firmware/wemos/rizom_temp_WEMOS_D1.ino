@@ -110,7 +110,7 @@ String histJson() {
     int idx = (start + i) % HIST_SIZE;
     if (i > 0) j += ",";
     unsigned long age = (millis() - historico[idx].ts) / 1000;
-    j += "{"age":" + String(age) + ","t":" + String(historico[idx].t, 2) + "}";
+    j += "{\"age\":" + String(age) + ",\"t\":" + String(historico[idx].t, 2) + "}";
   }
   return j + "]";
 }
@@ -294,8 +294,7 @@ void iniciarPortalAP() {
 //  PORTAL STA — Portal completo (modo conectado)
 // ═══════════════════════════════════════════════════════════════
 void iniciarPortalSTA() {
-  const char* hdrs[] = {"Cookie"};
-  portal.collectHeaders(hdrs, 1);
+  portal.collectHeaders("Cookie");
 
   portal.serveStatic("/style.css", LittleFS, "/style.css");
 
@@ -513,7 +512,7 @@ bool provisionar() {
   devId.toCharArray(cfg.deviceId, sizeof(cfg.deviceId));
   mqttHost.toCharArray(cfg.mqttHost, sizeof(cfg.mqttHost));
   cfg.mqttPort  = mqttPort;
-  cfg.intervalo = intervalo;
+  cfg.intervalo = (intervalo > 0 && intervalo <= 3600) ? intervalo : 60;
   cfg.codigo[0] = '\0';
 
   salvarConfig();
@@ -525,7 +524,7 @@ bool provisionar() {
 // ═══════════════════════════════════════════════════════════════
 //  MQTT
 // ═══════════════════════════════════════════════════════════════
-void conectarMQTT() {
+bool conectarMQTT() {
   mqtt.setServer(cfg.mqttHost, cfg.mqttPort);
   mqtt.setKeepAlive(60);
   mqtt.setSocketTimeout(10);
@@ -536,11 +535,14 @@ void conectarMQTT() {
   for (int i = 0; i < 5 && !mqtt.connected(); i++) {
     if (mqtt.connect(clientId.c_str())) {
       Serial.println("[MQTT] Conectado.");
-      return;
+      return true;
     }
     Serial.printf("[MQTT] rc=%d — tentativa %d/5\n", mqtt.state(), i + 1);
     delay(3000);
   }
+
+  Serial.println("[MQTT] 5 falhas consecutivas. Abrindo portal de reconfiguração...");
+  return false;
 }
 
 void publicarTemp(float t) {
@@ -616,17 +618,25 @@ void setup() {
 
   Serial.printf("[Config] SSID=%s  MQTT=%s:%d  ID=%s\n",
     cfg.ssid, cfg.mqttHost, cfg.mqttPort, cfg.deviceId);
+  if (cfg.intervalo <= 0 || cfg.intervalo > 3600) cfg.intervalo = 60;
 
   if (!conectarWifi()) { iniciarPortalAP(); estado = PORTAL_MODE; tsPortal = millis(); return; }
 
   if (cfg.codigo[0] != '\0') {
     estado = PROVISIONANDO;
   } else {
-    conectarMQTT();
+    if (!conectarMQTT()) {
+      iniciarPortalAP();
+      estado = PORTAL_MODE;
+      tsPortal = millis();
+      return;
+    }
     iniciarPortalSTA();
     float t = lerTemp();
-    if (!isnan(t)) pushLeitura(t);
-    publicarTemp(t);
+    if (!isnan(t)) {
+      pushLeitura(t);
+      if (mqtt.connected()) publicarTemp(t);
+    }
     publicarHeartbeat();
     tsLeitura = tsHB = millis();
     estado = OPERANDO;
@@ -666,7 +676,14 @@ void loop() {
     Serial.println("[WiFi] Desconectado. Reconectando...");
     conectarWifi(); return;
   }
-  if (!mqtt.connected()) conectarMQTT();
+  if (!mqtt.connected()) {
+    if (!conectarMQTT()) {
+      iniciarPortalAP();
+      estado = PORTAL_MODE;
+      tsPortal = millis();
+      return;
+    }
+  }
   mqtt.loop();
   ledOn();
 
