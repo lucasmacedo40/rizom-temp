@@ -103,6 +103,7 @@ export const equipamentosApi = {
   atualizar: (id: string, dados: Partial<Equipamento>) =>
     api.patch<Equipamento>(`/equipamentos/${id}`, dados),
   configDispositivo: (id: string) => api.get(`/equipamentos/${id}/config-dispositivo`),
+  deletar: (id: string) => api.delete(`/equipamentos/${id}`),
   gerarCodigo: (id: string) =>
     api.post<CodigoPareamento>(`/equipamentos/${id}/pareamento`),
 };

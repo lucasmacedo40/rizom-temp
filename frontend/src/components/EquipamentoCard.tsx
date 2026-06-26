@@ -1,6 +1,7 @@
 // src/components/EquipamentoCard.tsx
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wifi, WifiOff, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Wifi, WifiOff, AlertTriangle, CheckCircle, Clock, Trash2 } from 'lucide-react';
 import type { Equipamento, StatusEquip } from '../api';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,10 +21,14 @@ const STATUS_CONFIG: Record<StatusEquip, { cor: string; bg: string; label: strin
   sem_dados:{ cor: 'var(--text-muted)', bg: 'var(--offline-bg)', label: 'Sem dados', Icon: Clock },
 };
 
-interface Props { equip: Equipamento; }
+interface Props {
+  equip: Equipamento;
+  onRemover?: () => void;
+}
 
-export default function EquipamentoCard({ equip }: Props) {
+export default function EquipamentoCard({ equip, onRemover }: Props) {
   const navigate = useNavigate();
+  const [confirmando, setConfirmando] = useState(false);
   const { cor, bg, label, Icon } = STATUS_CONFIG[equip.status];
 
   const tempoStr = equip.ultima_leitura_em
@@ -70,13 +75,59 @@ export default function EquipamentoCard({ equip }: Props) {
             {TIPOS_PT[equip.tipo]} {equip.localizacao ? `· ${equip.localizacao}` : ''}
           </div>
         </div>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 5,
-          background: bg, padding: '4px 10px', borderRadius: 8,
-          fontSize: 12, color: cor, fontWeight: 500,
-        }}>
-          <Icon size={12} />
-          {label}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: bg, padding: '4px 10px', borderRadius: 8,
+            fontSize: 12, color: cor, fontWeight: 500,
+          }}>
+            <Icon size={12} />
+            {label}
+          </div>
+
+          {onRemover && !confirmando && (
+            <button
+              onClick={e => { e.stopPropagation(); setConfirmando(true); }}
+              title="Remover equipamento"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-muted)', padding: 4, borderRadius: 6,
+                display: 'flex', alignItems: 'center',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+
+          {confirmando && (
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Remover?</span>
+              <button
+                onClick={e => { e.stopPropagation(); onRemover?.(); }}
+                style={{
+                  fontSize: 12, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                  background: '#ef4444', color: 'white', border: 'none', fontWeight: 500,
+                }}
+              >
+                Sim
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); setConfirmando(false); }}
+                style={{
+                  fontSize: 12, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                  background: 'var(--surface-2)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Não
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

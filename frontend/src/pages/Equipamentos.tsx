@@ -45,6 +45,11 @@ export default function Equipamentos() {
 
   useEffect(() => { carregar(); }, []);
 
+  async function remover(id: string) {
+    await equipamentosApi.deletar(id);
+    carregar();
+  }
+
   async function criar() {
     if (!form.nome) return;
     setSalvando(true);
@@ -86,7 +91,7 @@ export default function Equipamentos() {
         <div style={{ color: 'var(--text-secondary)', padding: '40px 0' }}>Carregando...</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {lista.map(e => <EquipamentoCard key={e.id} equip={e} />)}
+          {lista.map(e => <EquipamentoCard key={e.id} equip={e} onRemover={() => remover(e.id)} />)}
         </div>
       )}
 
