@@ -36,6 +36,7 @@ export default function Equipamentos() {
   const [form, setForm] = useState<FormEquipamento>({ nome: '', tipo: 'refrigerador', localizacao: '' });
   const [salvando, setSalvando] = useState(false);
   const [equipCriado, setEquipCriado] = useState<string | null>(null);
+  const [erroRemover, setErroRemover] = useState<string | null>(null);
 
   async function carregar() {
     const { data } = await equipamentosApi.listar();
@@ -46,8 +47,16 @@ export default function Equipamentos() {
   useEffect(() => { carregar(); }, []);
 
   async function remover(id: string) {
-    await equipamentosApi.deletar(id);
-    carregar();
+    try {
+      await equipamentosApi.deletar(id);
+      carregar();
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number; data?: { erro?: string } } })?.response?.status;
+      const msg = (err as { response?: { data?: { erro?: string } } })?.response?.data?.erro;
+      if (status === 402) setErroRemover('Assinatura necessária para remover equipamentos.');
+      else if (status === 403) setErroRemover('Apenas administradores podem remover equipamentos.');
+      else setErroRemover(msg ?? 'Erro ao remover equipamento. Tente novamente.');
+    }
   }
 
   async function criar() {
@@ -86,6 +95,19 @@ export default function Equipamentos() {
           <Plus size={16} /> Adicionar equipamento
         </button>
       </div>
+
+      {erroRemover && (
+        <div
+          onClick={() => setErroRemover(null)}
+          style={{
+            marginBottom: 16, padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
+            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+            color: '#ef4444', fontSize: 13,
+          }}
+        >
+          {erroRemover} <span style={{ opacity: 0.6 }}>(clique para fechar)</span>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ color: 'var(--text-secondary)', padding: '40px 0' }}>Carregando...</div>
